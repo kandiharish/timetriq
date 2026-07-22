@@ -265,7 +265,7 @@ const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSel
 };
 
 export const Tasks: React.FC = () => {
-  const { timers, focusSession, startFocus, pauseFocus, stopFocus, resetFocus } = useTimer();
+  const { focusSession, startFocus, pauseFocus, stopFocus, resetFocus } = useTimer();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);

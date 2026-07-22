@@ -33,8 +33,6 @@ export const Layout: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   const runningTimers = Object.entries(timers).filter(([_, t]) => t.startTime !== null);
-  const primaryRunningTimer = runningTimers.length > 0 ? runningTimers[0] : null;
-  const primaryTaskId = primaryRunningTimer ? primaryRunningTimer[0] : null;
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
