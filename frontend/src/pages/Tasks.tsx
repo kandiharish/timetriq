@@ -1,13 +1,16 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { taskService, type Task } from '../services/taskService';
+import { timeService } from '../services/timeService';
 import { TaskForm } from '../components/TaskForm';
-import { GripVertical, MoreVertical, Search, CheckCircle2, Circle, PlayCircle, Clock, Calendar as CalendarIcon, X, Plus, Trash2, Check } from 'lucide-react';
+import { GripVertical, Search, CheckCircle2, Circle, Clock, Calendar as CalendarIcon, X, Plus, Trash2, Check, Play, Pause, XCircle, Target } from 'lucide-react';
 import { useTimer } from '../context/TimerContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+import { formatHoursCompact, parseEstimatedTime, formatHours } from '../lib/utils';
 
 interface SortableRowProps {
   task: Task;
@@ -16,23 +19,35 @@ interface SortableRowProps {
   onLogTime: (id: string) => void;
   onDelete: (id: string) => void;
   onViewDetails: (task: Task) => void;
+  onStatusChange: (id: string, newStatus: string) => Promise<void>;
+  onTimeLogged: () => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   isOverdue: boolean;
+  onStartFocus: (task: Task) => void;
 }
 
-const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSelect, onLogTime, onDelete, onViewDetails, isOverdue }) => {
+const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSelect, onLogTime, onDelete, onViewDetails, onStatusChange, onTimeLogged, showToast, isOverdue, onStartFocus }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id });
-  const [showDropdown, setShowDropdown] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const { timers, startTimer, pauseTimer, stopTimer, cancelTimer, getLiveElapsedSeconds } = useTimer();
+  const taskTimer = timers[task.id];
+  const isRunning = taskTimer && taskTimer.startTime !== null;
+  const isPaused = taskTimer && taskTimer.startTime === null;
+  const elapsed = getLiveElapsedSeconds(task.id);
+
+  const formatTimerDisplay = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    
+    if (h > 0) {
+      return `${h}h ${m}m ${s}s`;
+    }
+    if (m > 0) {
+      return `${m}m ${s}s`;
+    }
+    return `${s}s`;
+  };
   
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -96,13 +111,39 @@ const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSel
         </span>
       </td>
       <td style={{ padding: '8px 0' }}>
-        <span style={{ backgroundColor: statusColors.bg, color: statusColors.text, padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600 }}>
-          {task.status}
-        </span>
+        <select
+          value={task.status}
+          onChange={(e) => onStatusChange(task.id, e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            backgroundColor: statusColors.bg,
+            color: statusColors.text,
+            padding: '3px 16px 3px 8px',
+            borderRadius: '6px',
+            fontSize: '0.7rem',
+            fontWeight: 600,
+            border: '1px solid transparent',
+            cursor: 'pointer',
+            outline: 'none',
+            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='${encodeURIComponent(statusColors.text)}' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>")`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 6px center',
+            appearance: 'none',
+            WebkitAppearance: 'none',
+            minWidth: '95px',
+            textAlign: 'left'
+          }}
+        >
+          <option value="Todo" style={{ backgroundColor: 'white', color: '#374151' }}>Todo</option>
+          <option value="In Progress" style={{ backgroundColor: 'white', color: '#2563EB' }}>In Progress</option>
+          <option value="Review" style={{ backgroundColor: 'white', color: '#D97706' }}>Review</option>
+          <option value="Completed" style={{ backgroundColor: 'white', color: '#059669' }}>Completed</option>
+          <option value="Blocked" style={{ backgroundColor: 'white', color: '#DC2626' }}>Blocked</option>
+        </select>
       </td>
-      <td style={{ padding: '8px 0', color: '#4B5563', fontSize: '0.8125rem' }}>{task.estimatedHours}h</td>
-      <td style={{ padding: '8px 0', color: '#4B5563', fontSize: '0.8125rem' }}>{actualHours.toFixed(1)}h</td>
-      <td style={{ padding: '8px 0', color: '#4B5563', fontSize: '0.8125rem' }}>{remaining.toFixed(1)}h</td>
+      <td style={{ padding: '8px 0', color: '#4B5563', fontSize: '0.8125rem' }}>{formatHoursCompact(task.estimatedHours)}</td>
+      <td style={{ padding: '8px 0', color: '#4B5563', fontSize: '0.8125rem' }}>{formatHoursCompact(actualHours)}</td>
+      <td style={{ padding: '8px 0', color: '#4B5563', fontSize: '0.8125rem' }}>{formatHoursCompact(remaining)}</td>
       <td style={{ padding: '8px 0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ flex: 1, height: '4px', backgroundColor: '#F3F4F6', borderRadius: '2px', minWidth: '40px' }}>
@@ -118,34 +159,106 @@ const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSel
         {task.startDate || '—'}
       </td>
       <td style={{ padding: '8px 0' }} onClick={e => e.stopPropagation()}>
-        <div style={{ position: 'relative' }} ref={dropdownRef}>
-          <div 
-            onClick={() => setShowDropdown(!showDropdown)}
-            style={{ padding: '2px', cursor: 'pointer', borderRadius: '4px', display: 'inline-flex' }}
-          >
-            <MoreVertical size={14} color="#6B7280" />
-          </div>
-          
-          {showDropdown && (
-            <div style={{ 
-              position: 'absolute', right: 0, top: '100%', marginTop: '4px', 
-              backgroundColor: 'white', borderRadius: '6px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', 
-              border: '1px solid var(--color-border)', minWidth: '140px', zIndex: 10 
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-start' }}>
+          {/* Active / Paused Ticker */}
+          {(isRunning || isPaused) && (
+            <span style={{ 
+              fontSize: '0.65rem', 
+              fontFamily: 'monospace', 
+              fontWeight: 700, 
+              color: isRunning ? '#DC2626' : '#4B5563',
+              backgroundColor: isRunning ? '#FEF2F2' : '#F3F4F6',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              border: isRunning ? '1px solid #FECACA' : '1px solid #E5E7EB',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
             }}>
-              <div 
-                onClick={() => { setShowDropdown(false); onLogTime(task.id); }}
-                style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.8125rem', color: '#374151', borderBottom: '1px solid #F3F4F6' }}
-              >
-                <PlayCircle size={14} color="#4F46E5" /> Start Timer
-              </div>
-              <div 
-                onClick={() => { setShowDropdown(false); onDelete(task.id); }}
-                style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.8125rem', color: '#DC2626' }}
-              >
-                <Trash2 size={14} color="#DC2626" /> Delete
-              </div>
-            </div>
+              {isRunning && <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#DC2626', animation: 'pulse 1.5s infinite' }}></span>}
+              {formatTimerDisplay(elapsed)}
+            </span>
           )}
+
+          {/* Timer controls */}
+          {!taskTimer && (
+            <button 
+              onClick={() => startTimer(task.id, task.title)} 
+              title="Start Timer" 
+              className="btn-paper-icon"
+            >
+              <Play size={12} color="#4F46E5" />
+            </button>
+          )}
+
+          {isRunning && (
+            <button 
+              onClick={() => pauseTimer(task.id)} 
+              title="Pause Timer" 
+              className="btn-paper-icon"
+            >
+              <Pause size={12} color="#D97706" />
+            </button>
+          )}
+
+          {isPaused && (
+            <button 
+              onClick={() => startTimer(task.id, task.title)} 
+              title="Resume Timer" 
+              className="btn-paper-icon"
+            >
+              <Play size={12} color="#10B981" />
+            </button>
+          )}
+
+          {(isRunning || isPaused) && (
+            <>
+              <button 
+                onClick={async () => {
+                  await stopTimer(task.id);
+                  onTimeLogged();
+                }} 
+                title="Save & Log Time" 
+                className="btn-paper-icon"
+              >
+                <CheckCircle2 size={12} color="#10B981" />
+              </button>
+              <button 
+                onClick={() => cancelTimer(task.id)} 
+                title="Cancel Timer" 
+                className="btn-paper-icon"
+              >
+                <XCircle size={12} color="#EF4444" />
+              </button>
+            </>
+          )}
+
+          {/* Log Manual Time */}
+          <button 
+            onClick={() => onLogTime(task.id)} 
+            title="Log Time Manually" 
+            className="btn-paper-icon"
+          >
+            <Plus size={12} color="#4B5563" />
+          </button>
+
+          {/* Target Focus */}
+          <button 
+            onClick={() => onStartFocus(task)} 
+            title="Start Focus Sprint" 
+            className="btn-paper-icon"
+          >
+            <Target size={12} color="#DC2626" />
+          </button>
+
+          {/* Delete Task */}
+          <button 
+            onClick={() => onDelete(task.id)} 
+            title="Delete Task" 
+            className="btn-paper-icon"
+          >
+            <Trash2 size={12} color="#EF4444" />
+          </button>
         </div>
       </td>
     </tr>
@@ -153,6 +266,8 @@ const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSel
 };
 
 export const Tasks: React.FC = () => {
+  const { timers, focusSession, startFocus, pauseFocus, stopFocus, resetFocus } = useTimer();
+  const [viewMode, setViewMode] = useState<'list' | 'matrix'>('list');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -160,6 +275,33 @@ export const Tasks: React.FC = () => {
   
   // State for the editable modal to allow typing without instant API calls blocking
   const [modalDraft, setModalDraft] = useState<Task | null>(null);
+
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ 
+    message: string; 
+    onConfirm: () => void; 
+    confirmText?: string;
+    cancelText?: string;
+  } | null>(null);
+  const [logTimeTaskId, setLogTimeTaskId] = useState<string | null>(null);
+  const [manualTimeInput, setManualTimeInput] = useState('');
+  const [manualSuggestion, setManualSuggestion] = useState<{ hours: number; text: string } | null>(null);
+
+  useEffect(() => {
+    setManualTimeInput('');
+    setManualSuggestion(null);
+  }, [logTimeTaskId]);
+
+  const showToast = (message: string, type: 'error' | 'success' | 'info' = 'error') => {
+    setToast({ message, type });
+  };
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -173,16 +315,102 @@ export const Tasks: React.FC = () => {
     }
   }, [location.search, navigate]);
 
+  const [modalEstTimeInput, setModalEstTimeInput] = useState('');
+  const [modalSuggestion, setModalSuggestion] = useState<{ hours: number; text: string } | null>(null);
+
   useEffect(() => {
     if (activeDetailsTask) {
       setModalDraft(activeDetailsTask);
+      setModalEstTimeInput(activeDetailsTask.estimatedHours ? formatHours(activeDetailsTask.estimatedHours) : '');
+      setModalSuggestion(null);
     } else {
       setModalDraft(null);
+      setModalEstTimeInput('');
+      setModalSuggestion(null);
     }
   }, [activeDetailsTask]);
 
+  const handleModalEstTimeChange = (value: string) => {
+    setModalEstTimeInput(value);
+    
+    const { hours, needsClarification } = parseEstimatedTime(value);
+    if (needsClarification && value.trim()) {
+      const parsedInt = parseInt(value.trim(), 10);
+      if (!isNaN(parsedInt)) {
+        setModalSuggestion({
+          hours: parsedInt,
+          text: `Did you mean ${parsedInt} hours or ${parsedInt} minutes?`
+        });
+      } else {
+        setModalSuggestion(null);
+      }
+    } else {
+      setModalSuggestion(null);
+      if (modalDraft) {
+        setModalDraft({
+          ...modalDraft,
+          estimatedHours: hours
+        });
+      }
+    }
+  };
+
+  const handleModalEstTimeBlur = () => {
+    if (modalSuggestion) {
+      const hours = modalSuggestion.hours;
+      setModalEstTimeInput(`${hours} hours`);
+      setModalSuggestion(null);
+      handleModalSave('estimatedHours', hours);
+    } else {
+      const { hours } = parseEstimatedTime(modalEstTimeInput);
+      setModalEstTimeInput(hours > 0 ? formatHours(hours) : '');
+      handleModalSave('estimatedHours', hours);
+    }
+  };
+
+  const handleManualTimeChange = (value: string) => {
+    setManualTimeInput(value);
+    
+    const { needsClarification } = parseEstimatedTime(value);
+    if (needsClarification && value.trim()) {
+      const parsedInt = parseInt(value.trim(), 10);
+      if (!isNaN(parsedInt)) {
+        setManualSuggestion({
+          hours: parsedInt,
+          text: `Did you mean ${parsedInt} hours or ${parsedInt} minutes?`
+        });
+      } else {
+        setManualSuggestion(null);
+      }
+    } else {
+      setManualSuggestion(null);
+    }
+  };
+
+  const handleManualTimeBlur = () => {
+    if (manualSuggestion) {
+      const hours = manualSuggestion.hours;
+      setManualTimeInput(`${hours} hours`);
+      setManualSuggestion(null);
+    } else {
+      const { hours } = parseEstimatedTime(manualTimeInput);
+      setManualTimeInput(hours > 0 ? formatHours(hours) : '');
+    }
+  };
+
   const handleModalSave = async (field: keyof Task, value: any) => {
     if (!modalDraft) return;
+
+    if (field === 'status' && value === 'Completed') {
+      const actualHours = modalDraft.actualHours || 0;
+      if (actualHours <= 0) {
+        showToast("Cannot mark task as Completed without logging hours first!", 'error');
+        // Revert status state in modalDraft
+        setModalDraft(prev => prev ? { ...prev, status: activeDetailsTask?.status || 'Todo' } : null);
+        return;
+      }
+    }
+
     const updated = { ...modalDraft, [field]: value };
     setModalDraft(updated);
     
@@ -192,15 +420,15 @@ export const Tasks: React.FC = () => {
       setTasks(prev => prev.map(t => t.id === savedTask.id ? savedTask : t));
       // Update the underlying task so it stays in sync
       setActiveDetailsTask(savedTask);
-    } catch(e) {
-      console.error("Auto-save failed", e);
+    } catch(e: any) {
+      showToast(e.message || "Auto-save failed", 'error');
+      // Revert modalDraft
+      setModalDraft(activeDetailsTask);
     }
   };
 
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [inlineTaskTitle, setInlineTaskTitle] = useState('');
-  
-  const { startTimer } = useTimer();
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -290,6 +518,27 @@ export const Tasks: React.FC = () => {
     setSelectedTaskIds(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
   };
   
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+
+    if (newStatus === 'Completed' && (!task.actualHours || task.actualHours <= 0)) {
+      showToast("Cannot mark task as Completed without logging hours first!", 'error');
+      return;
+    }
+
+    try {
+      const updatedTask = await taskService.updateTask(id, {
+        ...task,
+        status: newStatus
+      });
+      setTasks(prev => prev.map(t => t.id === id ? updatedTask : t));
+      showToast("Status updated successfully", 'success');
+    } catch (e: any) {
+      showToast(e.message || "Failed to update status", 'error');
+    }
+  };
+  
   const toggleSelectAll = () => {
     if (selectedTaskIds.length === filteredTasks.length) {
       setSelectedTaskIds([]);
@@ -298,18 +547,33 @@ export const Tasks: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this task?')) {
-      try {
-        await taskService.deleteTask(id);
-        setTasks(prev => prev.filter(t => t.id !== id));
-      } catch (err) {
-        alert('Failed to delete task');
+  const handleDelete = (id: string) => {
+    setConfirmDialog({
+      message: 'Are you sure you want to delete this task? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          await taskService.deleteTask(id);
+          setTasks(prev => prev.filter(t => t.id !== id));
+          showToast('Task deleted successfully', 'success');
+        } catch (err) {
+          showToast('Failed to delete task', 'error');
+        }
       }
-    }
+    });
   };
 
   const handleBulkComplete = async () => {
+    const invalidTasks = selectedTaskIds
+      .map(id => tasks.find(t => t.id === id))
+      .filter(task => task && (!task.actualHours || task.actualHours <= 0));
+
+    if (invalidTasks.length > 0) {
+      showToast(`Cannot mark ${invalidTasks.length} task(s) as Completed because they have no logged hours. Please log hours first.`, 'error');
+      return;
+    }
+
     try {
       await Promise.all(selectedTaskIds.map(async id => {
         const task = tasks.find(t => t.id === id);
@@ -322,21 +586,34 @@ export const Tasks: React.FC = () => {
       }));
       setSelectedTaskIds([]);
       fetchTasks();
-    } catch (e) {
-      console.error("Bulk complete failed", e);
+      showToast("Selected tasks marked as Completed", 'success');
+    } catch (e: any) {
+      showToast(e.message || "Bulk complete failed", 'error');
     }
   };
 
-  const handleBulkDelete = async () => {
-    if (window.confirm(`Delete ${selectedTaskIds.length} tasks?`)) {
-      try {
-        await Promise.all(selectedTaskIds.map(id => taskService.deleteTask(id)));
-        setTasks(prev => prev.filter(t => !selectedTaskIds.includes(t.id)));
-        setSelectedTaskIds([]);
-      } catch (e) {
-        console.error("Bulk delete failed", e);
+  const handleBulkDelete = () => {
+    setConfirmDialog({
+      message: `Are you sure you want to delete the ${selectedTaskIds.length} selected task(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          await Promise.all(selectedTaskIds.map(id => taskService.deleteTask(id)));
+          setTasks(prev => prev.filter(t => !selectedTaskIds.includes(t.id)));
+          setSelectedTaskIds([]);
+          showToast('Selected tasks deleted successfully', 'success');
+        } catch (e) {
+          showToast('Failed to delete some tasks', 'error');
+        }
       }
-    }
+    });
+  };
+
+  const handleStartFocusSprint = (task: Task) => {
+    const focusDuration = Number(localStorage.getItem('timetriq_focus_duration') || '25');
+    startFocus(task.id, task.title, focusDuration);
+    showToast(`Started Focus Sprint for "${task.title}"`, 'success');
   };
 
   // Derived stats
@@ -367,6 +644,97 @@ export const Tasks: React.FC = () => {
 
   const statCardStyle = { flex: 1, minWidth: '140px', backgroundColor: '#FFFFFF', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', display: 'flex', gap: '8px', alignItems: 'center' };
 
+  // Eisenhower Quadrants
+  const doFirstTasks = filteredTasks.filter(t => (t.priority === 'High' || t.priority === 'Critical') && t.status !== 'Completed');
+  const scheduleTasks = filteredTasks.filter(t => t.priority === 'Medium' && t.status !== 'Completed');
+  const delegateTasks = filteredTasks.filter(t => t.priority === 'Low' && t.status !== 'Completed');
+  const completedOrBlockedTasks = filteredTasks.filter(t => t.status === 'Completed' || t.status === 'Blocked');
+
+  const quadrantCardStyle = {
+    backgroundColor: '#FFFFFF',
+    borderRadius: '12px',
+    border: '1.5px solid var(--color-border)',
+    padding: '16px',
+    boxShadow: '2px 2px 0px 0px #111827',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '12px',
+    minHeight: '280px'
+  };
+
+  const emptyQuadText = {
+    fontSize: '0.8125rem',
+    color: '#9CA3AF',
+    textAlign: 'center' as const,
+    padding: '24px 0',
+    fontStyle: 'italic'
+  };
+
+  const openModalForEdit = (task: Task) => {
+    setActiveDetailsTask(task);
+  };
+
+  const renderMatrixTaskCard = (task: Task) => {
+    const isRunning = timers[task.id] && timers[task.id].startTime !== null;
+    return (
+      <div 
+        key={task.id}
+        onClick={() => openModalForEdit(task)}
+        style={{
+          backgroundColor: '#FFFFFF',
+          border: '1.5px solid var(--color-border)',
+          borderRadius: '8px',
+          padding: '12px',
+          cursor: 'pointer',
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+          boxShadow: '1.5px 1.5px 0px 0px #111827',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.transform = 'translate(-1.5px, -1.5px)';
+          e.currentTarget.style.boxShadow = '3px 3px 0px 0px #111827';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.transform = 'none';
+          e.currentTarget.style.boxShadow = '1.5px 1.5px 0px 0px #111827';
+        }}
+      >
+        <div style={{ minWidth: 0, flex: 1, marginRight: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {isRunning && (
+              <span style={{ 
+                width: '6px', 
+                height: '6px', 
+                borderRadius: '50%', 
+                backgroundColor: '#DC2626', 
+                animation: 'pulse 1.5s infinite' 
+              }}></span>
+            )}
+            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+              {task.title}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '4px', fontSize: '0.7rem', color: '#6B7280' }}>
+            <span>Est: {formatHoursCompact(task.estimatedHours)}</span>
+            <span>Spent: {formatHoursCompact(task.actualHours || 0)}</span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
+          <button
+            onClick={() => handleStartFocusSprint(task)}
+            title="Start Focus Sprint"
+            className="btn-paper-icon"
+            style={{ padding: '4px' }}
+          >
+            <Target size={12} color="#DC2626" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (loading && tasks.length === 0) {
     return <div style={{ padding: '24px', textAlign: 'center', color: '#6B7280', fontSize: '0.875rem' }}>Loading tasks...</div>;
   }
@@ -382,11 +750,7 @@ export const Tasks: React.FC = () => {
         </div>
         <button 
           onClick={() => setShowForm(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'var(--color-primary)', 
-            color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', 
-            fontSize: '0.8125rem', fontWeight: 500, cursor: 'pointer', boxShadow: 'var(--shadow-sm)'
-          }}
+          className="btn-paper btn-paper-primary"
         >
           <Plus size={14} /> New Task
         </button>
@@ -487,70 +851,157 @@ export const Tasks: React.FC = () => {
             </button>
           )}
         </div>
-      </div>
 
-      {/* Main Table */}
-      <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', paddingBottom: '60px' }}>
-        <div style={{ overflowX: 'auto', padding: '0 24px' }}>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ color: '#6B7280', borderBottom: '1px solid var(--color-border)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  <th style={{ padding: '12px 0', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '14px' }}></div>
-                    <input type="checkbox" checked={selectedTaskIds.length > 0 && selectedTaskIds.length === filteredTasks.length} onChange={toggleSelectAll} style={{ cursor: 'pointer' }} />
-                    Task Title
-                  </th>
-                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Priority</th>
-                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Status</th>
-                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Est. Hours</th>
-                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Logged Hours</th>
-                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Remaining</th>
-                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Progress</th>
-                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Due Date</th>
-                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Created</th>
-                  <th style={{ padding: '12px 0', fontWeight: 600 }}></th>
-                </tr>
-              </thead>
-              <SortableContext items={filteredTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                <tbody>
-                  {filteredTasks.length === 0 ? (
-                    <tr><td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#6B7280' }}>No tasks found matching your filters.</td></tr>
-                  ) : filteredTasks.map(task => (
-                    <SortableRow 
-                      key={task.id} 
-                      task={task} 
-                      isSelected={selectedTaskIds.includes(task.id)}
-                      onToggleSelect={toggleSelect}
-                      onLogTime={startTimer}
-                      onDelete={handleDelete}
-                      onViewDetails={setActiveDetailsTask}
-                      isOverdue={task.dueDate < today && task.status !== 'Completed'}
-                    />
-                  ))}
-                  
-                  {/* Inline Creation Row */}
-                  <tr style={{ backgroundColor: '#F9FAFB' }}>
-                    <td colSpan={10} style={{ padding: '8px 0' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '24px' }}>
-                        <Plus size={14} color="#9CA3AF" />
-                        <input 
-                          type="text" 
-                          placeholder="Type task title and press Enter to add..." 
-                          value={inlineTaskTitle}
-                          onChange={(e) => setInlineTaskTitle(e.target.value)}
-                          onKeyDown={handleInlineSubmit}
-                          style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.8125rem', color: '#111827', width: '100%' }}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </SortableContext>
-            </table>
-          </DndContext>
+        {/* View Mode Toggle Group */}
+        <div style={{ display: 'flex', gap: '4px', border: '1.5px solid var(--color-border)', padding: '2px', borderRadius: '8px', backgroundColor: '#F3F4F6', boxShadow: '1.5px 1.5px 0px 0px #111827' }}>
+          <button 
+            onClick={() => setViewMode('list')} 
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              borderRadius: '6px',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: viewMode === 'list' ? '#FFFFFF' : 'transparent',
+              color: viewMode === 'list' ? '#111827' : '#6B7280',
+              boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+            }}
+          >
+            List
+          </button>
+          <button 
+            onClick={() => setViewMode('matrix')} 
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              borderRadius: '6px',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: viewMode === 'matrix' ? '#FFFFFF' : 'transparent',
+              color: viewMode === 'matrix' ? '#111827' : '#6B7280',
+              boxShadow: viewMode === 'matrix' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+            }}
+          >
+            Eisenhower Matrix
+          </button>
         </div>
       </div>
+
+      {/* View Rendering */}
+      {viewMode === 'matrix' ? (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '20px',
+          marginBottom: '40px'
+        }}>
+          {/* Quadrant 1: Do First */}
+          <div style={{ ...quadrantCardStyle, borderLeft: '4px solid #EF4444' }}>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#991B1B', margin: '0 0 12px 0', textTransform: 'uppercase' }}>🔥 Do First (Urgent)</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '300px' }}>
+              {doFirstTasks.length === 0 ? <div style={emptyQuadText}>No urgent tasks</div> : doFirstTasks.map(t => renderMatrixTaskCard(t))}
+            </div>
+          </div>
+
+          {/* Quadrant 2: Schedule */}
+          <div style={{ ...quadrantCardStyle, borderLeft: '4px solid #F59E0B' }}>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#92400E', margin: '0 0 12px 0', textTransform: 'uppercase' }}>📅 Schedule (Medium)</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '300px' }}>
+              {scheduleTasks.length === 0 ? <div style={emptyQuadText}>No scheduled tasks</div> : scheduleTasks.map(t => renderMatrixTaskCard(t))}
+            </div>
+          </div>
+
+          {/* Quadrant 3: Optimize */}
+          <div style={{ ...quadrantCardStyle, borderLeft: '4px solid #3B82F6' }}>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1E40AF', margin: '0 0 12px 0', textTransform: 'uppercase' }}>⚡ Optimize (Low)</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '300px' }}>
+              {delegateTasks.length === 0 ? <div style={emptyQuadText}>No low priority tasks</div> : delegateTasks.map(t => renderMatrixTaskCard(t))}
+            </div>
+          </div>
+
+          {/* Quadrant 4: Finished/Blocked */}
+          <div style={{ ...quadrantCardStyle, borderLeft: '4px solid #10B981' }}>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#065F46', margin: '0 0 12px 0', textTransform: 'uppercase' }}>✓ Completed / Blocked</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '300px' }}>
+              {completedOrBlockedTasks.length === 0 ? <div style={emptyQuadText}>No tasks here</div> : completedOrBlockedTasks.map(t => renderMatrixTaskCard(t))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Main Table */
+        <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', paddingBottom: '60px' }}>
+          <div style={{ overflowX: 'auto', padding: '0 24px' }}>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ color: '#6B7280', borderBottom: '1px solid var(--color-border)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <th style={{ padding: '12px 0', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '14px' }}></div>
+                      <input type="checkbox" checked={selectedTaskIds.length > 0 && selectedTaskIds.length === filteredTasks.length} onChange={toggleSelectAll} style={{ cursor: 'pointer' }} />
+                      Task Title
+                    </th>
+                    <th style={{ padding: '12px 0', fontWeight: 600 }}>Priority</th>
+                    <th style={{ padding: '12px 0', fontWeight: 600 }}>Status</th>
+                    <th style={{ padding: '12px 0', fontWeight: 600 }}>Est. Hours</th>
+                    <th style={{ padding: '12px 0', fontWeight: 600 }}>Logged Hours</th>
+                    <th style={{ padding: '12px 0', fontWeight: 600 }}>Remaining</th>
+                    <th style={{ padding: '12px 0', fontWeight: 600 }}>Progress</th>
+                    <th style={{ padding: '12px 0', fontWeight: 600 }}>Due Date</th>
+                    <th style={{ padding: '12px 0', fontWeight: 600 }}>Created</th>
+                    <th style={{ padding: '12px 0', fontWeight: 600 }}></th>
+                  </tr>
+                </thead>
+                <SortableContext items={filteredTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                  <tbody>
+                    {filteredTasks.length === 0 ? (
+                      <tr><td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#6B7280' }}>No tasks found matching your filters.</td></tr>
+                    ) : filteredTasks.map(task => (
+                      <SortableRow 
+                        key={task.id} 
+                        task={task} 
+                        isSelected={selectedTaskIds.includes(task.id)}
+                        onToggleSelect={toggleSelect}
+                        onLogTime={setLogTimeTaskId}
+                        onDelete={handleDelete}
+                        onViewDetails={setActiveDetailsTask}
+                        onStatusChange={handleStatusChange}
+                        onTimeLogged={fetchTasks}
+                        showToast={showToast}
+                        isOverdue={task.dueDate < today && task.status !== 'Completed'}
+                        onStartFocus={handleStartFocusSprint}
+                      />
+                    ))}
+                    
+                    {/* Inline Creation Row */}
+                    <tr style={{ backgroundColor: '#F9FAFB' }}>
+                      <td style={{ padding: '12px 8px 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '14px' }}></div>
+                        <input type="checkbox" disabled style={{ opacity: 0.5 }} />
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151' }}>+ Quick Add</span>
+                      </td>
+                      <td colSpan={9} style={{ padding: '12px 0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #E5E7EB', borderRadius: '6px', padding: '4px 8px', backgroundColor: '#FFFFFF', width: '90%' }}>
+                          <Plus size={14} color="#9CA3AF" />
+                          <input 
+                            type="text" 
+                            placeholder="Type task title and press Enter to add..." 
+                            value={inlineTaskTitle}
+                            onChange={(e) => setInlineTaskTitle(e.target.value)}
+                            onKeyDown={handleInlineSubmit}
+                            style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.8125rem', color: '#111827', width: '100%' }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </SortableContext>
+              </table>
+            </DndContext>
+          </div>
+        </div>
+      )}
 
       {/* Floating Action Bar */}
       {selectedTaskIds.length > 0 && (
@@ -642,15 +1093,83 @@ export const Tasks: React.FC = () => {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '4px', fontWeight: 600 }}>Est. Hours</div>
+              <div style={{ position: 'relative' }}>
+                <div style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '4px', fontWeight: 600 }}>Est. Time</div>
                 <input 
-                  type="number"
-                  value={modalDraft.estimatedHours}
-                  onChange={(e) => setModalDraft({ ...modalDraft, estimatedHours: parseFloat(e.target.value) || 0 })}
-                  onBlur={(e) => handleModalSave('estimatedHours', parseFloat(e.target.value) || 0)}
+                  type="text"
+                  placeholder="e.g. 4h 34m"
+                  value={modalEstTimeInput}
+                  onChange={(e) => handleModalEstTimeChange(e.target.value)}
+                  onBlur={handleModalEstTimeBlur}
                   style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #E5E7EB', fontSize: '0.875rem', outline: 'none' }}
                 />
+                {modalSuggestion && (
+                  <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: '100%',
+                    marginTop: '4px',
+                    padding: '8px 12px',
+                    backgroundColor: '#EFF6FF',
+                    border: '1px solid #BFDBFE',
+                    borderRadius: '6px',
+                    fontSize: '0.7rem',
+                    color: '#1E40AF',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    zIndex: 50,
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}>
+                    <span>{modalSuggestion.text}</span>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          const cleanVal = `${modalSuggestion.hours} hours`;
+                          setModalEstTimeInput(cleanVal);
+                          setModalSuggestion(null);
+                          handleModalSave('estimatedHours', modalSuggestion.hours);
+                        }}
+                        style={{
+                          padding: '2px 8px',
+                          backgroundColor: '#3B82F6',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {modalSuggestion.hours} hrs
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          const cleanVal = `${modalSuggestion.hours} minutes`;
+                          setModalEstTimeInput(cleanVal);
+                          const minsAsHours = parseFloat((modalSuggestion.hours / 60).toFixed(2));
+                          setModalSuggestion(null);
+                          handleModalSave('estimatedHours', minsAsHours);
+                        }}
+                        style={{
+                          padding: '2px 8px',
+                          backgroundColor: '#3B82F6',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {modalSuggestion.hours} mins
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '4px', fontWeight: 600 }}>Logged Hours</div>
@@ -681,6 +1200,375 @@ export const Tasks: React.FC = () => {
                 <CheckCircle2 size={12} color="#10B981" /> All edits saved automatically
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Styles for slideIn Animation */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes slideIn {
+          from {
+            transform: translateY(-20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+      `}} />
+
+      {/* In-App Toast Notification */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          right: '24px',
+          backgroundColor: toast.type === 'error' ? '#EF4444' : (toast.type === 'success' ? '#10B981' : '#3B82F6'),
+          color: 'white',
+          padding: '12px 24px',
+          borderRadius: '8px',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          animation: 'slideIn 0.3s ease-out',
+          fontSize: '0.875rem',
+          fontWeight: 500,
+        }}>
+          <span>{toast.message}</span>
+          <button 
+            onClick={() => setToast(null)} 
+            style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Custom Confirmation Dialog */}
+      {confirmDialog && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          backdropFilter: 'blur(2px)',
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            width: '400px',
+            maxWidth: '90%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            border: '1px solid #E5E7EB',
+          }}>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '1.125rem', fontWeight: 600, color: '#111827' }}>Confirm Action</h3>
+            <p style={{ margin: '0 0 24px 0', fontSize: '0.875rem', color: '#4B5563', lineHeight: '1.5' }}>{confirmDialog.message}</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button 
+                onClick={() => setConfirmDialog(null)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#F3F4F6',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  fontSize: '0.8125rem',
+                }}
+              >
+                {confirmDialog.cancelText || 'Cancel'}
+              </button>
+              <button 
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                }}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#DC2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  fontSize: '0.8125rem',
+                }}
+              >
+                {confirmDialog.confirmText || 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {logTimeTaskId && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          zIndex: 1000,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          backdropFilter: 'blur(2px)'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            width: '400px',
+            maxWidth: '90%',
+            padding: '24px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+            border: '1px solid #E5E7EB'
+          }}>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '1.125rem', fontWeight: 600, color: '#111827' }}>Log Time Manually</h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: '0.8125rem', color: '#6B7280' }}>
+              Logging time for: <strong>{tasks.find(t => t.id === logTimeTaskId)?.title}</strong>
+            </p>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const { hours } = parseEstimatedTime(manualTimeInput);
+              if (hours <= 0) {
+                showToast("Invalid time format (e.g. use 1.5, 2h, or 1h 30m).", "error");
+                return;
+              }
+              
+              const form = e.currentTarget;
+              const notesVal = (form.elements.namedItem('notes') as HTMLInputElement).value;
+              
+              try {
+                await timeService.createTimeEntry({
+                  task_id: logTimeTaskId,
+                  date: new Date().toISOString().split('T')[0],
+                  hours_worked: hours,
+                  notes: notesVal || 'Logged manually'
+                });
+                showToast("Time logged successfully!", "success");
+                setLogTimeTaskId(null);
+                fetchTasks();
+              } catch (err: any) {
+                showToast(err.message || "Failed to log time", "error");
+              }
+            }}>
+              <div style={{ marginBottom: '16px', position: 'relative' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', marginBottom: '4px' }}>Time Spent</label>
+                <input 
+                  required 
+                  type="text" 
+                  name="time" 
+                  placeholder="e.g. 1.5, 2h 30m, 45m" 
+                  value={manualTimeInput}
+                  onChange={(e) => handleManualTimeChange(e.target.value)}
+                  onBlur={handleManualTimeBlur}
+                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #E5E7EB', fontSize: '0.875rem', outline: 'none' }} 
+                />
+                
+                {manualSuggestion && (
+                  <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: '100%',
+                    marginTop: '4px',
+                    padding: '8px 12px',
+                    backgroundColor: '#EFF6FF',
+                    border: '1px solid #BFDBFE',
+                    borderRadius: '6px',
+                    fontSize: '0.7rem',
+                    color: '#1E40AF',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    zIndex: 50,
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}>
+                    <span>{manualSuggestion.text}</span>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          const val = `${manualSuggestion.hours} hours`;
+                          setManualTimeInput(val);
+                          setManualSuggestion(null);
+                        }}
+                        style={{
+                          padding: '2px 8px',
+                          backgroundColor: '#4F46E5',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {manualSuggestion.hours} hrs
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          const val = `${manualSuggestion.hours} minutes`;
+                          setManualTimeInput(val);
+                          setManualSuggestion(null);
+                        }}
+                        style={{
+                          padding: '2px 8px',
+                          backgroundColor: '#3B82F6',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {manualSuggestion.hours} mins
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', marginBottom: '4px' }}>Notes</label>
+                <input type="text" name="notes" placeholder="What did you do?" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #E5E7EB', fontSize: '0.875rem', outline: 'none' }} />
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <button type="button" onClick={() => setLogTimeTaskId(null)} className="btn-paper">Cancel</button>
+                <button type="submit" className="btn-paper btn-paper-primary">Log Time</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {focusSession && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: '#0F172A',
+          color: '#F8FAFC',
+          zIndex: 2000,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px'
+        }}>
+          <div style={{
+            maxWidth: '500px',
+            width: '100%',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '24px'
+          }}>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              letterSpacing: '0.15em',
+              textTransform: 'uppercase',
+              color: '#38BDF8',
+              backgroundColor: '#0369A1',
+              padding: '4px 12px',
+              borderRadius: '20px'
+            }}>
+              Focus Sprint Mode
+            </span>
+            
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 700, margin: 0, lineHeight: 1.3 }}>
+              {focusSession.taskTitle}
+            </h2>
+
+            <div style={{
+              width: '240px',
+              height: '240px',
+              borderRadius: '50%',
+              border: '8px solid #1E293B',
+              borderTopColor: '#38BDF8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '3.5rem',
+              fontWeight: 700,
+              fontFamily: 'monospace',
+              position: 'relative',
+              boxShadow: '0 0 40px rgba(56, 189, 248, 0.1)'
+            }}>
+              <div style={{
+                position: 'absolute',
+                fontSize: '3.5rem',
+                fontWeight: 700,
+                color: '#F8FAFC',
+                transform: 'none'
+              }}>
+                {Math.floor(focusSession.timeLeft / 60)}:{(focusSession.timeLeft % 60).toString().padStart(2, '0')}
+              </div>
+            </div>
+
+            {focusSession.timeLeft === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+                <div style={{ fontSize: '1rem', color: '#34D399', fontWeight: 600 }}>🎉 Sprint Session Finished!</div>
+                <button
+                  onClick={() => {
+                    const loggedTimeVal = (focusSession.duration / 3600).toFixed(2);
+                    setManualTimeInput(`${loggedTimeVal} hours`);
+                    setLogTimeTaskId(focusSession.taskId);
+                    stopFocus();
+                  }}
+                  className="btn-paper btn-paper-primary"
+                  style={{ width: '100%', fontSize: '0.875rem', padding: '12px' }}
+                >
+                  Log Sprint Time Now
+                </button>
+                <button
+                  onClick={stopFocus}
+                  style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: '0.8125rem', cursor: 'pointer' }}
+                >
+                  Close Focus Mode
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
+                {focusSession.isRunning ? (
+                  <button
+                    onClick={pauseFocus}
+                    className="btn-paper"
+                    style={{ padding: '10px 24px', backgroundColor: '#F59E0B', color: '#111827', border: 'none' }}
+                  >
+                    Pause
+                  </button>
+                ) : (
+                  <button
+                    onClick={resetFocus}
+                    className="btn-paper btn-paper-primary"
+                    style={{ padding: '10px 24px' }}
+                  >
+                    Resume
+                  </button>
+                )}
+                
+                <button
+                  onClick={stopFocus}
+                  className="btn-paper btn-paper-danger"
+                  style={{ padding: '10px 24px' }}
+                >
+                  Quit Session
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -45,11 +45,59 @@ export const Dashboard: React.FC = () => {
 
   // Calculate top-level stats
   const totalTasks = tasks.length;
-  const plannedHours = tasks.reduce((acc, t) => acc + t.estimatedHours, 0);
-  const loggedHours = timeEntries.reduce((acc, e) => acc + e.hours_worked, 0);
-  const remainingCapacity = Math.max(metrics.weekly_capacity - loggedHours, 0);
+  const plannedHours = parseFloat(tasks.reduce((acc, t) => acc + t.estimatedHours, 0).toFixed(2));
+  const loggedHours = parseFloat(timeEntries.reduce((acc, e) => acc + e.hours_worked, 0).toFixed(2));
+  const remainingCapacity = parseFloat(Math.max(metrics.weekly_capacity - loggedHours, 0).toFixed(2));
   const avgProgress = totalTasks > 0 ? Math.round((tasks.filter(t => t.status === 'Completed').length / totalTasks) * 100) : 0;
   const capacityPercentage = metrics.weekly_capacity > 0 ? Math.min((loggedHours / metrics.weekly_capacity) * 100, 100) : 0;
+
+  // Daily capacity commitment computations
+  const localSettings = localStorage.getItem('timetriq_settings');
+  const dailyCapacity = localSettings ? JSON.parse(localSettings).daily_capacity : 8;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayTasks = tasks.filter(t => t.dueDate === todayStr && t.status !== 'Completed');
+  const todayCommittedHours = parseFloat(todayTasks.reduce((sum, t) => sum + t.estimatedHours, 0).toFixed(2));
+  const todayCommitPercentage = dailyCapacity > 0 ? Math.round((todayCommittedHours / dailyCapacity) * 100) : 0;
+
+  // Coach Insights computations
+  const completedTasks = tasks.filter(t => t.status === 'Completed');
+  const estimatedAndCompleted = completedTasks.filter(t => t.estimatedHours > 0);
+  
+  let totalPlanned = 0;
+  let totalSpent = 0;
+  let underestimationCount = 0;
+  let overestimationCount = 0;
+
+  estimatedAndCompleted.forEach(t => {
+    totalPlanned += t.estimatedHours;
+    totalSpent += t.actualHours || 0;
+    if ((t.actualHours || 0) > t.estimatedHours) underestimationCount++;
+    if ((t.actualHours || 0) < t.estimatedHours) overestimationCount++;
+  });
+
+  const coachNotes: string[] = [];
+  if (estimatedAndCompleted.length >= 3) {
+    const ratio = totalSpent / totalPlanned;
+    if (ratio > 1.15) {
+      coachNotes.push(`Trend alert: You spend ${((ratio - 1) * 100).toFixed(0)}% more time than you estimate on tasks. Try adding a 20% safety margin.`);
+    } else if (ratio < 0.85) {
+      coachNotes.push(`Trend alert: You complete tasks ${((1 - ratio) * 100).toFixed(0)}% faster than estimated! You can afford to schedule tighter time slots.`);
+    }
+    
+    if (underestimationCount > overestimationCount) {
+      coachNotes.push(`Underestimation pattern: ${underestimationCount} out of ${estimatedAndCompleted.length} tasks took longer than planned. Keep estimates conservative!`);
+    }
+  }
+
+  // Active overrun task alerts
+  const activeOverrunTasks = tasks.filter(t => t.status === 'In Progress' && t.estimatedHours > 0 && (t.actualHours || 0) > t.estimatedHours);
+  if (activeOverrunTasks.length > 0) {
+    coachNotes.push(`Overrun Warning: "${activeOverrunTasks[0].title}" is currently ${(activeOverrunTasks[0].actualHours - activeOverrunTasks[0].estimatedHours).toFixed(1)}h over its estimate.`);
+  }
+
+  if (coachNotes.length === 0) {
+    coachNotes.push("Coach status: Collecting task history. Log at least 3 completed tasks with estimates to generate custom productivity alerts.");
+  }
 
   // Filter tasks for "My Tasks"
   const filteredTasks = tasks.filter(t => {
@@ -168,6 +216,58 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Commitment Capacity Gauge */}
+      <div style={{
+        backgroundColor: '#FFFFFF',
+        padding: '20px',
+        borderRadius: '12px',
+        border: '1.5px solid var(--color-border)',
+        boxShadow: '1.5px 1.5px 0px 0px #111827',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#111827', margin: 0 }}>
+            Today's Commitment Capacity ({todayCommittedHours.toFixed(1)}h / {dailyCapacity}h)
+          </h3>
+          <span style={{
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            color: todayCommitPercentage > 100 ? '#DC2626' : todayCommitPercentage >= 80 ? '#10B981' : '#3B82F6',
+            backgroundColor: todayCommitPercentage > 100 ? '#FEF2F2' : todayCommitPercentage >= 80 ? '#ECFDF5' : '#EFF6FF',
+            padding: '2px 8px',
+            borderRadius: '4px'
+          }}>
+            {todayCommitPercentage}% Scheduled
+          </span>
+        </div>
+        
+        <div style={{ height: '12px', backgroundColor: '#F3F4F6', borderRadius: '6px', overflow: 'hidden', border: '1px solid #E5E7EB' }}>
+          <div style={{
+            width: `${Math.min(todayCommitPercentage, 100)}%`,
+            height: '100%',
+            backgroundColor: todayCommitPercentage > 100 ? '#EF4444' : todayCommitPercentage >= 80 ? '#10B981' : '#3B82F6',
+            borderRadius: '6px',
+            transition: 'width 0.3s ease'
+          }}></div>
+        </div>
+
+        {todayCommitPercentage > 100 ? (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', backgroundColor: '#FEF2F2', padding: '10px 14px', borderRadius: '6px', border: '1px solid #FCA5A5', color: '#B91C1C', fontSize: '0.75rem', fontWeight: 500 }}>
+            ⚠️ <strong>Overcommitted:</strong> You have planned more tasks than your available capacity today. Consider postponing a task.
+          </div>
+        ) : todayCommitPercentage >= 80 ? (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', backgroundColor: '#ECFDF5', padding: '10px 14px', borderRadius: '6px', border: '1px solid #A7F3D0', color: '#047857', fontSize: '0.75rem', fontWeight: 500 }}>
+            ⚡ <strong>Optimal:</strong> Your schedule is perfectly balanced for maximum focus without burnout.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', backgroundColor: '#EFF6FF', padding: '10px 14px', borderRadius: '6px', border: '1px solid #BFDBFE', color: '#1D4ED8', fontSize: '0.75rem', fontWeight: 500 }}>
+            ℹ️ <strong>Capacity Available:</strong> You still have room to schedule more tasks for today if needed.
+          </div>
+        )}
+      </div>
+
       {/* Middle Row */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--spacing-6)' }}>
         
@@ -204,8 +304,8 @@ export const Dashboard: React.FC = () => {
               </thead>
               <tbody>
                 {filteredTasks.map((t, i) => {
-                  const act = actuals[t.id] || 0;
-                  const rem = Math.max(t.estimatedHours - act, 0);
+                  const act = parseFloat((actuals[t.id] || 0).toFixed(2));
+                  const rem = parseFloat(Math.max(t.estimatedHours - act, 0).toFixed(2));
                   
                   return (
                   <tr key={t.id} style={{ borderBottom: i === filteredTasks.length - 1 ? 'none' : '1px solid var(--color-border)' }}>
@@ -250,6 +350,20 @@ export const Dashboard: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--color-primary)' }}></div> <span style={{ fontWeight: 500 }}>Utilized ({loggedHours}h)</span></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--color-success)' }}></div> <span style={{ fontWeight: 500 }}>Remaining ({remainingCapacity}h)</span></div>
               </div>
+            </div>
+          </div>
+
+          {/* Time Coach Insights */}
+          <div style={{ ...cardStyle }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: '0 0 12px 0', color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🧠 Time Coach Insights
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {coachNotes.map((note, index) => (
+                <div key={index} style={{ fontSize: '0.75rem', color: '#4B5563', padding: '10px 12px', backgroundColor: '#F9FAFB', borderRadius: '6px', border: '1px solid #E5E7EB', lineHeight: 1.4 }}>
+                  {note}
+                </div>
+              ))}
             </div>
           </div>
         </div>

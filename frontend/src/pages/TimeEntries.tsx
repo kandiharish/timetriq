@@ -7,7 +7,11 @@ import { useTimer } from '../context/TimerContext';
 import { Link } from 'react-router-dom';
 
 export const TimeEntries: React.FC = () => {
-  const { elapsedSeconds, activeTaskId, stopTimer } = useTimer();
+  const { timers, stopTimer, getLiveElapsedSeconds } = useTimer();
+  const runningTimers = Object.entries(timers).filter(([_, t]) => t.startTime !== null);
+  const primaryRunningTimer = runningTimers.length > 0 ? runningTimers[0] : null;
+  const primaryTaskId = primaryRunningTimer ? primaryRunningTimer[0] : null;
+  const primaryLiveSeconds = primaryTaskId ? getLiveElapsedSeconds(primaryTaskId) : 0;
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [tasks, setTasks] = useState<Record<string, Task>>({});
   const [loading, setLoading] = useState(true);
@@ -246,7 +250,18 @@ export const TimeEntries: React.FC = () => {
                       </td>
                       <td style={{ padding: '8px 12px', color: '#4B5563', fontSize: '0.8125rem' }}>{entry.date}</td>
                       <td style={{ padding: '8px 12px', color: '#4B5563', fontSize: '0.8125rem' }}>09:00 AM</td>
-                      <td style={{ padding: '8px 12px', color: '#4B5563', fontSize: '0.8125rem' }}>{Math.floor(entry.hours_worked)}:{Math.round((entry.hours_worked % 1) * 60).toString().padStart(2, '0')} PM</td>
+                      <td style={{ padding: '8px 12px', color: '#4B5563', fontSize: '0.8125rem' }}>
+                        {(() => {
+                          const startHour = 9;
+                          const startMinutes = 0;
+                          const totalMinutes = Math.round(entry.hours_worked * 60);
+                          const endHourRaw = startHour + Math.floor((startMinutes + totalMinutes) / 60);
+                          const endMins = (startMinutes + totalMinutes) % 60;
+                          const endAmPm = endHourRaw >= 12 ? 'PM' : 'AM';
+                          const endHour = endHourRaw > 12 ? endHourRaw - 12 : endHourRaw === 0 ? 12 : endHourRaw;
+                          return `${endHour}:${endMins.toString().padStart(2, '0')} ${endAmPm}`;
+                        })()}
+                      </td>
                       <td style={{ padding: '8px 12px', color: '#111827', fontWeight: 600, fontSize: '0.8125rem' }}>
                         {Math.floor(entry.hours_worked)}h {Math.round((entry.hours_worked % 1) * 60)}m
                       </td>
@@ -296,7 +311,7 @@ export const TimeEntries: React.FC = () => {
         <div style={{ backgroundColor: '#FFFFFF', padding: '16px', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '0.875rem', fontWeight: 600, margin: 0, color: '#111827' }}>Time Tracker</h3>
-            {activeTaskId ? (
+            {primaryTaskId ? (
               <span style={{ backgroundColor: '#ECFDF5', color: '#059669', padding: '2px 6px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase' }}>
                 <div style={{ width: '6px', height: '6px', backgroundColor: '#059669', borderRadius: '50%', animation: 'pulse 2s infinite' }}></div> Running
               </span>
@@ -307,23 +322,23 @@ export const TimeEntries: React.FC = () => {
             )}
           </div>
           
-          {activeTaskId ? (
+          {primaryTaskId ? (
             <>
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827', marginBottom: '2px' }}>{tasks[activeTaskId]?.title || 'Unknown Task'}</div>
-                <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>{tasks[activeTaskId]?.description || 'Working on this task'}</div>
+                <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827', marginBottom: '2px' }}>{tasks[primaryTaskId]?.title || 'Unknown Task'}</div>
+                <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>{tasks[primaryTaskId]?.description || 'Working on this task'}</div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <div>
                   <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', lineHeight: 1 }}>
-                    {String(Math.floor(elapsedSeconds / 3600)).padStart(2, '0')}:
-                    {String(Math.floor((elapsedSeconds % 3600) / 60)).padStart(2, '0')}:
-                    {String(elapsedSeconds % 60).padStart(2, '0')}
+                    {String(Math.floor(primaryLiveSeconds / 3600)).padStart(2, '0')}:
+                    {String(Math.floor((primaryLiveSeconds % 3600) / 60)).padStart(2, '0')}:
+                    {String(primaryLiveSeconds % 60).padStart(2, '0')}
                   </div>
                   <div style={{ fontSize: '0.7rem', color: '#6B7280', marginTop: '6px' }}>Tracking time...</div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={stopTimer} style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#FEF2F2', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#DC2626', cursor: 'pointer' }}>
+                  <button onClick={() => stopTimer(primaryTaskId)} style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#FEF2F2', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#DC2626', cursor: 'pointer' }}>
                     <Square size={14} fill="currentColor" />
                   </button>
                 </div>

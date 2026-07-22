@@ -64,12 +64,21 @@ export const taskService = {
         headers,
         body: JSON.stringify(task)
       });
-      if (!response.ok) throw new Error('Failed to create task');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Failed to create task');
+      }
       return await response.json();
-    } catch (e) {
+    } catch (e: any) {
+      if (e.message && !e.message.includes('Failed to fetch') && !e.message.includes('NetworkError')) {
+        throw e;
+      }
       console.warn("Backend not available, saving to personal local storage.");
+      if (task.status === 'Completed') {
+        throw new Error('Cannot mark task as Completed without logging hours first.');
+      }
       const tasks = JSON.parse(localStorage.getItem('timetriq_tasks') || '[]');
-      const newTask: Task = { ...task, id: Date.now().toString(), status: task.status || 'Todo' };
+      const newTask: Task = { ...task, id: Date.now().toString(), status: task.status || 'Todo', actualHours: 0 };
       tasks.push(newTask);
       localStorage.setItem('timetriq_tasks', JSON.stringify(tasks));
       return newTask;
@@ -83,8 +92,14 @@ export const taskService = {
         method: 'DELETE',
         headers
       });
-      if (!response.ok) throw new Error('Failed to delete task');
-    } catch (e) {
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Failed to delete task');
+      }
+    } catch (e: any) {
+      if (e.message && !e.message.includes('Failed to fetch') && !e.message.includes('NetworkError')) {
+        throw e;
+      }
       console.warn("Backend not available, deleting from personal local storage.");
       let tasks = JSON.parse(localStorage.getItem('timetriq_tasks') || '[]');
       tasks = tasks.filter((t: any) => t.id !== id);
@@ -100,14 +115,28 @@ export const taskService = {
         headers,
         body: JSON.stringify(task)
       });
-      if (!response.ok) throw new Error('Failed to update task');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Failed to update task');
+      }
       return await response.json();
-    } catch (e) {
+    } catch (e: any) {
+      if (e.message && !e.message.includes('Failed to fetch') && !e.message.includes('NetworkError')) {
+        throw e;
+      }
       console.warn("Backend not available, updating in personal local storage.");
       let tasks = JSON.parse(localStorage.getItem('timetriq_tasks') || '[]');
       const index = tasks.findIndex((t: any) => t.id === id);
       if (index !== -1) {
-        tasks[index] = { ...tasks[index], ...task };
+        const existingTask = tasks[index];
+        const newStatus = task.status;
+        const actualHours = (task as any).actualHours !== undefined ? (task as any).actualHours : existingTask.actualHours;
+        
+        if (newStatus === 'Completed' && (!actualHours || actualHours <= 0)) {
+          throw new Error('Cannot mark task as Completed without logging hours first.');
+        }
+        
+        tasks[index] = { ...existingTask, ...task };
         localStorage.setItem('timetriq_tasks', JSON.stringify(tasks));
         return tasks[index];
       }

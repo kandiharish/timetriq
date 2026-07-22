@@ -13,6 +13,9 @@ def create_task(user_id: str, task_in: TaskCreate) -> TaskInDB:
     db = _get_db()
     doc_ref = db.collection('tasks').document()
     
+    if task_in.status == 'Completed' and task_in.actualHours <= 0:
+        raise ValueError("Cannot mark task as Completed without logging hours first.")
+        
     task_data = task_in.model_dump()
     # Convert dates to ISO strings for Firestore storage
     if 'startDate' in task_data:
@@ -69,10 +72,15 @@ def update_task(user_id: str, task_id: str, task_update: TaskUpdate) -> Optional
         if data.get('userId') == user_id and not data.get('isArchived', False):
             update_data = task_update.model_dump(exclude_unset=True)
             
-            # Check status change for completedDate
-            if update_data.get('status') == 'Completed' and data.get('status') != 'Completed':
-                from datetime import timezone
-                update_data['completedDate'] = str(datetime.now(timezone.utc).date())
+            # Check status change for completedDate and validate actual hours
+            if update_data.get('status') == 'Completed':
+                actual_hours = update_data.get('actualHours', data.get('actualHours', 0.0))
+                if actual_hours <= 0:
+                    raise ValueError("Cannot mark task as Completed without logging hours first.")
+                
+                if data.get('status') != 'Completed':
+                    from datetime import timezone
+                    update_data['completedDate'] = str(datetime.now(timezone.utc).date())
                 
             # Format dates
             if 'startDate' in update_data:

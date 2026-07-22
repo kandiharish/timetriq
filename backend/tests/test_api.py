@@ -69,3 +69,45 @@ def test_create_time_entry():
     list_resp = client.get("/api/v1/time-entries/")
     assert list_resp.status_code == 200
     assert any(te["id"] == te_id for te in list_resp.json())
+
+def test_completed_task_validation():
+    # 1. Try to create a task as Completed with 0 actual hours (should fail)
+    task_data = {
+        "title": "Invalid Completed Task",
+        "estimatedHours": 2,
+        "projectId": "proj_123",
+        "assignedUserId": "user_123",
+        "startDate": "2026-07-21",
+        "dueDate": "2026-07-25",
+        "status": "Completed",
+        "actualHours": 0.0
+    }
+    create_resp = client.post("/api/v1/tasks/", json=task_data)
+    assert create_resp.status_code == 400
+    assert "Cannot mark task as Completed without logging hours first" in create_resp.json().get("detail", "")
+
+    # 2. Create a valid task in Todo status
+    task_data["status"] = "Todo"
+    create_ok = client.post("/api/v1/tasks/", json=task_data)
+    assert create_ok.status_code in [200, 201]
+    task = create_ok.json()
+    task_id = task.get("id")
+
+    # 3. Try to update status to Completed with 0 actual hours (should fail)
+    update_data = {
+        "status": "Completed"
+    }
+    update_fail = client.put(f"/api/v1/tasks/{task_id}", json=update_data)
+    assert update_fail.status_code == 400
+    assert "Cannot mark task as Completed without logging hours first" in update_fail.json().get("detail", "")
+
+    # 4. Update status to Completed with actualHours > 0 (should succeed)
+    update_data_ok = {
+        "status": "Completed",
+        "actualHours": 3.5
+    }
+    update_succeed = client.put(f"/api/v1/tasks/{task_id}", json=update_data_ok)
+    assert update_succeed.status_code == 200
+    assert update_succeed.json()["status"] == "Completed"
+    assert update_succeed.json()["actualHours"] == 3.5
+
