@@ -5,8 +5,8 @@ import { useTimer } from '../context/TimerContext';
 import { 
   LayoutDashboard, CheckSquare, Calendar, Clock, 
   BarChart2, Settings as SettingsIcon,
-  Search, Bell, LogOut, ChevronDown, Hexagon,
-  PieChart, Activity, TrendingUp, HelpCircle, Briefcase, Plus, User, X
+  Search, Bell, ChevronDown, Hexagon,
+  PieChart, Activity, TrendingUp, Briefcase, Plus, X
 } from 'lucide-react';
 
 export const Layout: React.FC = () => {
@@ -35,7 +35,6 @@ export const Layout: React.FC = () => {
   const runningTimers = Object.entries(timers).filter(([_, t]) => t.startTime !== null);
   const primaryRunningTimer = runningTimers.length > 0 ? runningTimers[0] : null;
   const primaryTaskId = primaryRunningTimer ? primaryRunningTimer[0] : null;
-  const primaryLiveSeconds = primaryTaskId ? getLiveElapsedSeconds(primaryTaskId) : 0;
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);

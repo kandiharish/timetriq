@@ -21,12 +21,11 @@ interface SortableRowProps {
   onViewDetails: (task: Task) => void;
   onStatusChange: (id: string, newStatus: string) => Promise<void>;
   onTimeLogged: () => void;
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   isOverdue: boolean;
   onStartFocus: (task: Task) => void;
 }
 
-const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSelect, onLogTime, onDelete, onViewDetails, onStatusChange, onTimeLogged, showToast, isOverdue, onStartFocus }) => {
+const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSelect, onLogTime, onDelete, onViewDetails, onStatusChange, onTimeLogged, isOverdue, onStartFocus }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id });
   
   const { timers, startTimer, pauseTimer, stopTimer, cancelTimer, getLiveElapsedSeconds } = useTimer();
@@ -968,7 +967,6 @@ export const Tasks: React.FC = () => {
                         onViewDetails={setActiveDetailsTask}
                         onStatusChange={handleStatusChange}
                         onTimeLogged={fetchTasks}
-                        showToast={showToast}
                         isOverdue={task.dueDate < today && task.status !== 'Completed'}
                         onStartFocus={handleStartFocusSprint}
                       />

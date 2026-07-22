@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { taskService, type Task } from '../services/taskService';
-import { timeService, type TimeEntry } from '../services/timeService';
 import { AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { formatHoursCompact } from '../lib/utils';
 

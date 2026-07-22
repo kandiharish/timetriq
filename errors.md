@@ -1,20 +1,15 @@
-npm error
-npm error Could not resolve dependency:
-npm error peer react@"^16.5.1 || ^17.0.0 || ^18.0.0" from lucide-react@0.395.0
-npm error node_modules/lucide-react
-npm error   lucide-react@"^0.395.0" from the root project
-npm error
-npm error Conflicting peer dependency: react@18.3.1
-npm error node_modules/react
-npm error   peer react@"^16.5.1 || ^17.0.0 || ^18.0.0" from lucide-react@0.395.0
-npm error   node_modules/lucide-react
-npm error     lucide-react@"^0.395.0" from the root project
-npm error
-npm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.
-npm error
-npm error
-npm error For a full report see:
-npm error /vercel/.npm/_logs/2026-07-22T17_11_24_530Z-eresolve-report.txt
-npm error A complete log of this run can be found in: /vercel/.npm/_logs/2026-07-22T17_11_24_530Z-debug-0.log
-Error: Command "npm install" exited with 1
+src/components/Layout.tsx(8,17): error TS6133: 'LogOut' is declared but its value is never read.
+src/components/Layout.tsx(9,35): error TS6133: 'HelpCircle' is declared but its value is never read.
+src/components/Layout.tsx(9,64): error TS6133: 'User' is declared but its value is never read.
+src/components/Layout.tsx(38,9): error TS6133: 'primaryLiveSeconds' is declared but its value is never read.
+src/context/TimerContext.tsx(83,15): error TS2345: Argument of type '(prev: Record<string, TaskTimer>) => { [x: string]: TaskTimer | { startTime: null; elapsedSeconds: number; }; }' is not assignable to parameter of type 'SetStateAction<Record<string, TaskTimer>>'.
+  Type '(prev: Record<string, TaskTimer>) => { [x: string]: TaskTimer | { startTime: null; elapsedSeconds: number; }; }' is not assignable to type '(prevState: Record<string, TaskTimer>) => Record<string, TaskTimer>'.
+    Type '{ [x: string]: TaskTimer | { startTime: null; elapsedSeconds: number; }; }' is not assignable to type 'Record<string, TaskTimer>'.
+      'string' index signatures are incompatible.
+        Type 'TaskTimer | { startTime: null; elapsedSeconds: number; }' is not assignable to type 'TaskTimer'.
+          Property 'taskTitle' is missing in type '{ startTime: null; elapsedSeconds: number; }' but required in type 'TaskTimer'.
+src/pages/Dashboard.tsx(95,88): error TS2532: Object is possibly 'undefined'.
+src/pages/Reports.tsx(3,1): error TS6192: All imports in import declaration are unused.
+src/pages/Tasks.tsx(29,152): error TS6133: 'showToast' is declared but its value is never read.
+Error: Command "npm run build" exited with 2
 Deployment Summary

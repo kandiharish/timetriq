@@ -87,6 +87,7 @@ export const TimerProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return {
         ...prev,
         [taskId]: {
+          ...existing,
           startTime: null,
           elapsedSeconds: existing.elapsedSeconds + sessionSeconds
         }

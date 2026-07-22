@@ -92,7 +92,11 @@ export const Dashboard: React.FC = () => {
   // Active overrun task alerts
   const activeOverrunTasks = tasks.filter(t => t.status === 'In Progress' && t.estimatedHours > 0 && (t.actualHours || 0) > t.estimatedHours);
   if (activeOverrunTasks.length > 0) {
-    coachNotes.push(`Overrun Warning: "${activeOverrunTasks[0].title}" is currently ${(activeOverrunTasks[0].actualHours - activeOverrunTasks[0].estimatedHours).toFixed(1)}h over its estimate.`);
+    const firstOverrun = activeOverrunTasks[0];
+    if (firstOverrun) {
+      const overrunAmt = (firstOverrun.actualHours || 0) - firstOverrun.estimatedHours;
+      coachNotes.push(`Overrun Warning: "${firstOverrun.title}" is currently ${overrunAmt.toFixed(1)}h over its estimate.`);
+    }
   }
 
   if (coachNotes.length === 0) {
