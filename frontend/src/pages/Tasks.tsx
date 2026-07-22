@@ -266,7 +266,6 @@ const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSel
 
 export const Tasks: React.FC = () => {
   const { timers, focusSession, startFocus, pauseFocus, stopFocus, resetFocus } = useTimer();
-  const [viewMode, setViewMode] = useState<'list' | 'matrix'>('list');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -643,97 +642,6 @@ export const Tasks: React.FC = () => {
 
   const statCardStyle = { flex: 1, minWidth: '140px', backgroundColor: '#FFFFFF', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', display: 'flex', gap: '8px', alignItems: 'center' };
 
-  // Eisenhower Quadrants
-  const doFirstTasks = filteredTasks.filter(t => (t.priority === 'High' || t.priority === 'Critical') && t.status !== 'Completed');
-  const scheduleTasks = filteredTasks.filter(t => t.priority === 'Medium' && t.status !== 'Completed');
-  const delegateTasks = filteredTasks.filter(t => t.priority === 'Low' && t.status !== 'Completed');
-  const completedOrBlockedTasks = filteredTasks.filter(t => t.status === 'Completed' || t.status === 'Blocked');
-
-  const quadrantCardStyle = {
-    backgroundColor: '#FFFFFF',
-    borderRadius: '12px',
-    border: '1.5px solid var(--color-border)',
-    padding: '16px',
-    boxShadow: '2px 2px 0px 0px #111827',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '12px',
-    minHeight: '280px'
-  };
-
-  const emptyQuadText = {
-    fontSize: '0.8125rem',
-    color: '#9CA3AF',
-    textAlign: 'center' as const,
-    padding: '24px 0',
-    fontStyle: 'italic'
-  };
-
-  const openModalForEdit = (task: Task) => {
-    setActiveDetailsTask(task);
-  };
-
-  const renderMatrixTaskCard = (task: Task) => {
-    const isRunning = timers[task.id] && timers[task.id].startTime !== null;
-    return (
-      <div 
-        key={task.id}
-        onClick={() => openModalForEdit(task)}
-        style={{
-          backgroundColor: '#FFFFFF',
-          border: '1.5px solid var(--color-border)',
-          borderRadius: '8px',
-          padding: '12px',
-          cursor: 'pointer',
-          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-          boxShadow: '1.5px 1.5px 0px 0px #111827',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.transform = 'translate(-1.5px, -1.5px)';
-          e.currentTarget.style.boxShadow = '3px 3px 0px 0px #111827';
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.transform = 'none';
-          e.currentTarget.style.boxShadow = '1.5px 1.5px 0px 0px #111827';
-        }}
-      >
-        <div style={{ minWidth: 0, flex: 1, marginRight: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {isRunning && (
-              <span style={{ 
-                width: '6px', 
-                height: '6px', 
-                borderRadius: '50%', 
-                backgroundColor: '#DC2626', 
-                animation: 'pulse 1.5s infinite' 
-              }}></span>
-            )}
-            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
-              {task.title}
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '4px', fontSize: '0.7rem', color: '#6B7280' }}>
-            <span>Est: {formatHoursCompact(task.estimatedHours)}</span>
-            <span>Spent: {formatHoursCompact(task.actualHours || 0)}</span>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
-          <button
-            onClick={() => handleStartFocusSprint(task)}
-            title="Start Focus Sprint"
-            className="btn-paper-icon"
-            style={{ padding: '4px' }}
-          >
-            <Target size={12} color="#DC2626" />
-          </button>
-        </div>
-      </div>
-    );
-  };
-
   if (loading && tasks.length === 0) {
     return <div style={{ padding: '24px', textAlign: 'center', color: '#6B7280', fontSize: '0.875rem' }}>Loading tasks...</div>;
   }
@@ -850,87 +758,10 @@ export const Tasks: React.FC = () => {
             </button>
           )}
         </div>
-
-        {/* View Mode Toggle Group */}
-        <div style={{ display: 'flex', gap: '4px', border: '1.5px solid var(--color-border)', padding: '2px', borderRadius: '8px', backgroundColor: '#F3F4F6', boxShadow: '1.5px 1.5px 0px 0px #111827' }}>
-          <button 
-            onClick={() => setViewMode('list')} 
-            style={{
-              padding: '6px 12px',
-              fontSize: '0.8125rem',
-              fontWeight: 600,
-              borderRadius: '6px',
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: viewMode === 'list' ? '#FFFFFF' : 'transparent',
-              color: viewMode === 'list' ? '#111827' : '#6B7280',
-              boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-            }}
-          >
-            List
-          </button>
-          <button 
-            onClick={() => setViewMode('matrix')} 
-            style={{
-              padding: '6px 12px',
-              fontSize: '0.8125rem',
-              fontWeight: 600,
-              borderRadius: '6px',
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: viewMode === 'matrix' ? '#FFFFFF' : 'transparent',
-              color: viewMode === 'matrix' ? '#111827' : '#6B7280',
-              boxShadow: viewMode === 'matrix' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-            }}
-          >
-            Eisenhower Matrix
-          </button>
-        </div>
       </div>
 
-      {/* View Rendering */}
-      {viewMode === 'matrix' ? (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '20px',
-          marginBottom: '40px'
-        }}>
-          {/* Quadrant 1: Do First */}
-          <div style={{ ...quadrantCardStyle, borderLeft: '4px solid #EF4444' }}>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#991B1B', margin: '0 0 12px 0', textTransform: 'uppercase' }}>🔥 Do First (Urgent)</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '300px' }}>
-              {doFirstTasks.length === 0 ? <div style={emptyQuadText}>No urgent tasks</div> : doFirstTasks.map(t => renderMatrixTaskCard(t))}
-            </div>
-          </div>
-
-          {/* Quadrant 2: Schedule */}
-          <div style={{ ...quadrantCardStyle, borderLeft: '4px solid #F59E0B' }}>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#92400E', margin: '0 0 12px 0', textTransform: 'uppercase' }}>📅 Schedule (Medium)</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '300px' }}>
-              {scheduleTasks.length === 0 ? <div style={emptyQuadText}>No scheduled tasks</div> : scheduleTasks.map(t => renderMatrixTaskCard(t))}
-            </div>
-          </div>
-
-          {/* Quadrant 3: Optimize */}
-          <div style={{ ...quadrantCardStyle, borderLeft: '4px solid #3B82F6' }}>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1E40AF', margin: '0 0 12px 0', textTransform: 'uppercase' }}>⚡ Optimize (Low)</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '300px' }}>
-              {delegateTasks.length === 0 ? <div style={emptyQuadText}>No low priority tasks</div> : delegateTasks.map(t => renderMatrixTaskCard(t))}
-            </div>
-          </div>
-
-          {/* Quadrant 4: Finished/Blocked */}
-          <div style={{ ...quadrantCardStyle, borderLeft: '4px solid #10B981' }}>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#065F46', margin: '0 0 12px 0', textTransform: 'uppercase' }}>✓ Completed / Blocked</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '300px' }}>
-              {completedOrBlockedTasks.length === 0 ? <div style={emptyQuadText}>No tasks here</div> : completedOrBlockedTasks.map(t => renderMatrixTaskCard(t))}
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* Main Table */
-        <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', paddingBottom: '60px' }}>
+      {/* Main Table */}
+      <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', paddingBottom: '60px' }}>
           <div style={{ overflowX: 'auto', padding: '0 24px' }}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', textAlign: 'left' }}>
@@ -999,7 +830,6 @@ export const Tasks: React.FC = () => {
             </DndContext>
           </div>
         </div>
-      )}
 
       {/* Floating Action Bar */}
       {selectedTaskIds.length > 0 && (

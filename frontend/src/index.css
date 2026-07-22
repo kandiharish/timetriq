@@ -116,16 +116,16 @@ ul {
   scrollbar-width: none;  /* Firefox */
 }
 
-/* Paper Classic Button Look */
+/* Paper Classic Button Look with Soft Light Shadows */
 .btn-paper {
   background-color: #FFFFFF;
   color: #111827;
-  border: 2px solid #111827 !important;
+  border: 1.5px solid #D1D5DB !important;
   border-radius: 6px;
   padding: 8px 16px;
   font-size: 0.8125rem;
   font-weight: 600;
-  box-shadow: 2.5px 2.5px 0px 0px #111827;
+  box-shadow: 1.5px 1.5px 0px 0px rgba(0, 0, 0, 0.08);
   transition: transform 0.05s ease, box-shadow 0.05s ease, background-color 0.05s ease;
   cursor: pointer;
   display: inline-flex;
@@ -140,16 +140,16 @@ ul {
 }
 
 .btn-paper:active {
-  transform: translate(2.5px, 2.5px);
-  box-shadow: 0px 0px 0px 0px #111827;
+  transform: translate(1.5px, 1.5px);
+  box-shadow: 0px 0px 0px 0px rgba(0, 0, 0, 0.08);
 }
 
 /* Primary Paper button (Indigo bg) */
 .btn-paper-primary {
   background-color: #4F46E5;
   color: #FFFFFF;
-  border: 2px solid #111827 !important;
-  box-shadow: 2.5px 2.5px 0px 0px #111827;
+  border: 1.5px solid #4338CA !important;
+  box-shadow: 1.5px 1.5px 0px 0px rgba(0, 0, 0, 0.12);
 }
 
 .btn-paper-primary:hover {
@@ -157,16 +157,16 @@ ul {
 }
 
 .btn-paper-primary:active {
-  transform: translate(2.5px, 2.5px);
-  box-shadow: 0px 0px 0px 0px #111827;
+  transform: translate(1.5px, 1.5px);
+  box-shadow: 0px 0px 0px 0px rgba(0, 0, 0, 0.12);
 }
 
 /* Danger Paper button (Red bg) */
 .btn-paper-danger {
   background-color: #EF4444;
   color: #FFFFFF;
-  border: 2px solid #111827 !important;
-  box-shadow: 2.5px 2.5px 0px 0px #111827;
+  border: 1.5px solid #DC2626 !important;
+  box-shadow: 1.5px 1.5px 0px 0px rgba(0, 0, 0, 0.12);
 }
 
 .btn-paper-danger:hover {
@@ -174,16 +174,16 @@ ul {
 }
 
 .btn-paper-danger:active {
-  transform: translate(2.5px, 2.5px);
-  box-shadow: 0px 0px 0px 0px #111827;
+  transform: translate(1.5px, 1.5px);
+  box-shadow: 0px 0px 0px 0px rgba(0, 0, 0, 0.12);
 }
 
 /* Small inline icon buttons in task rows */
 .btn-paper-icon {
-  border: 1.5px solid #111827 !important;
+  border: 1px solid #E5E7EB !important;
   border-radius: 4px;
   background-color: #FFFFFF;
-  box-shadow: 1.5px 1.5px 0px 0px #111827;
+  box-shadow: 1px 1px 0px 0px rgba(0, 0, 0, 0.06);
   transition: transform 0.05s ease, box-shadow 0.05s ease, background-color 0.05s ease;
   cursor: pointer;
   padding: 4px;
@@ -198,6 +198,6 @@ ul {
 }
 
 .btn-paper-icon:active {
-  transform: translate(1.5px, 1.5px);
-  box-shadow: 0px 0px 0px 0px #111827;
+  transform: translate(1px, 1px);
+  box-shadow: 0px 0px 0px 0px rgba(0, 0, 0, 0.06);
 }
