@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  /* Brand Colors */
+  --color-primary: #4F46E5; /* Indigo 600 */
+  --color-primary-hover: #4338CA;
+  --color-primary-light: #EEF2FF;
+  
+  /* Sidebar Colors (Dark Theme) */
+  --color-sidebar-bg: #111827; /* Gray 900 */
+  --color-sidebar-surface: #1F2937;
+  --color-sidebar-text: #9CA3AF;
+  --color-sidebar-text-active: #F9FAFB;
+  --color-sidebar-active-bg: #4F46E5;
+  --color-sidebar-border: #374151;
+
+  /* Surface & Background */
+  --color-background: #F9FAFB; /* Gray 50 */
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F3F4F6;
+  --color-border: #E5E7EB;
+  
+  /* Status Colors */
+  --color-success: #10B981; 
+  --color-success-bg: #D1FAE5;
+  --color-error: #EF4444; 
+  --color-error-bg: #FEE2E2;
+  --color-warning: #F59E0B;
+  --color-warning-bg: #FEF3C7;
+  --color-info: #3B82F6;
+  --color-info-bg: #DBEAFE;
+  
+  /* Text Colors */
+  --color-text-primary: #111827;
+  --color-text-secondary: #6B7280;
+  
+  /* Spacing */
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+  
+  /* Border Radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-full: 9999px;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+  
+  /* Fonts */
+  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--color-text-primary);
+  background-color: var(--color-background);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--color-primary-hover);
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+ul {
+  list-style: none;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+* {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
