@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.firebase import init_firebase
 from app.api import api_router
 from contextlib import asynccontextmanager
+import os
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,9 +21,12 @@ app = FastAPI(
 )
 
 # Set up CORS
+FRONTEND_URL = os.getenv("FRONTEND_URL", "*")
+allowed_origins = [FRONTEND_URL] if FRONTEND_URL != "*" else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this to the frontend origin
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
