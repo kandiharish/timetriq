@@ -128,7 +128,7 @@ export const Dashboard: React.FC = () => {
      const task = tasks.find(t => t.id === e.task_id);
      return {
        id: e.id,
-       text: `Logged ${e.hours_worked}h on ${task?.title || 'Unknown Task'}`,
+       text: `Logged ${parseFloat(e.hours_worked.toFixed(2))}h on ${task?.title || 'Unknown Task'}`,
        time: e.date,
        user: 'Me'
      };
@@ -143,7 +143,7 @@ export const Dashboard: React.FC = () => {
   
   const weeklyData = last7Days.map(date => {
      const entriesForDay = timeEntries.filter(e => e.date === date);
-     const logged = entriesForDay.reduce((acc, e) => acc + e.hours_worked, 0);
+     const logged = parseFloat(entriesForDay.reduce((acc, e) => acc + e.hours_worked, 0).toFixed(2));
      const planned = 8; // Assumed 8 hrs planned per day
      return {
        name: date.split('-').slice(1).join('/'),
@@ -161,7 +161,7 @@ export const Dashboard: React.FC = () => {
      return {
        name: date.split('-').slice(1).join('/'),
        estimated: cumulativeEst,
-       actual: cumulativeAct
+       actual: parseFloat(cumulativeAct.toFixed(2))
      };
   });
 

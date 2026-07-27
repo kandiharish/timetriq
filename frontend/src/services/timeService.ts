@@ -36,7 +36,8 @@ export const timeService = {
       return await response.json();
     } catch (e) {
       console.warn("Backend not available, using personal local storage for time entries.");
-      return JSON.parse(localStorage.getItem('timetriq_time_entries') || '[]');
+      const uid = auth.currentUser?.uid || 'guest';
+      return JSON.parse(localStorage.getItem(`timetriq_time_entries_${uid}`) || '[]');
     }
   },
 
@@ -48,7 +49,8 @@ export const timeService = {
       return await response.json();
     } catch (e) {
       console.warn("Backend not available, using personal local storage for time entries.");
-      const entries = JSON.parse(localStorage.getItem('timetriq_time_entries') || '[]');
+      const uid = auth.currentUser?.uid || 'guest';
+      const entries = JSON.parse(localStorage.getItem(`timetriq_time_entries_${uid}`) || '[]');
       return entries.filter((e: any) => e.task_id === taskId);
     }
   },
@@ -68,20 +70,21 @@ export const timeService = {
       return await response.json();
     } catch (e) {
       console.warn("Backend not available, saving time entry to personal local storage.");
-      const entries = JSON.parse(localStorage.getItem('timetriq_time_entries') || '[]');
+      const uid = auth.currentUser?.uid || 'guest';
+      const entries = JSON.parse(localStorage.getItem(`timetriq_time_entries_${uid}`) || '[]');
       const newEntry = { ...entry, id: Date.now().toString() };
       entries.push(newEntry);
-      localStorage.setItem('timetriq_time_entries', JSON.stringify(entries));
+      localStorage.setItem(`timetriq_time_entries_${uid}`, JSON.stringify(entries));
 
       // Update actualHours in local storage task
-      const tasks = JSON.parse(localStorage.getItem('timetriq_tasks') || '[]');
+      const tasks = JSON.parse(localStorage.getItem(`timetriq_tasks_${uid}`) || '[]');
       const updatedTasks = tasks.map((t: any) => {
         if (t.id === entry.task_id) {
           return { ...t, actualHours: (t.actualHours || 0) + entry.hours_worked };
         }
         return t;
       });
-      localStorage.setItem('timetriq_tasks', JSON.stringify(updatedTasks));
+      localStorage.setItem(`timetriq_tasks_${uid}`, JSON.stringify(updatedTasks));
 
       return newEntry;
     }
@@ -97,20 +100,21 @@ export const timeService = {
       if (!response.ok) throw new Error('Failed to delete time entry');
     } catch (e) {
       console.warn("Backend not available, deleting time entry from personal local storage.");
-      let entries = JSON.parse(localStorage.getItem('timetriq_time_entries') || '[]');
+      const uid = auth.currentUser?.uid || 'guest';
+      let entries = JSON.parse(localStorage.getItem(`timetriq_time_entries_${uid}`) || '[]');
       const targetEntry = entries.find((e: any) => e.id === id);
       entries = entries.filter((e: any) => e.id !== id);
-      localStorage.setItem('timetriq_time_entries', JSON.stringify(entries));
+      localStorage.setItem(`timetriq_time_entries_${uid}`, JSON.stringify(entries));
 
       if (targetEntry) {
-        const tasks = JSON.parse(localStorage.getItem('timetriq_tasks') || '[]');
+        const tasks = JSON.parse(localStorage.getItem(`timetriq_tasks_${uid}`) || '[]');
         const updatedTasks = tasks.map((t: any) => {
           if (t.id === targetEntry.task_id) {
             return { ...t, actualHours: Math.max(0, (t.actualHours || 0) - targetEntry.hours_worked) };
           }
           return t;
         });
-        localStorage.setItem('timetriq_tasks', JSON.stringify(updatedTasks));
+        localStorage.setItem(`timetriq_tasks_${uid}`, JSON.stringify(updatedTasks));
       }
     }
   }
