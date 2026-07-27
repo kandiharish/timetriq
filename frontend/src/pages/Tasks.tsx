@@ -672,14 +672,14 @@ export const Tasks: React.FC = () => {
           <div style={{ backgroundColor: '#F0FDF4', padding: '6px', borderRadius: '6px', color: '#0891B2' }}><Clock size={16} /></div>
           <div>
             <div style={{ fontSize: '0.7rem', color: '#6B7280', fontWeight: 500 }}>Est. Hours</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#111827' }}>{totalEst}h</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#111827' }}>{parseFloat(totalEst.toFixed(1))}h</div>
           </div>
         </div>
         <div style={statCardStyle}>
           <div style={{ backgroundColor: '#FAF5FF', padding: '6px', borderRadius: '6px', color: '#9333EA' }}><Clock size={16} /></div>
           <div>
             <div style={{ fontSize: '0.7rem', color: '#6B7280', fontWeight: 500 }}>Log Hours</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#111827' }}>{totalAct.toFixed(1)}h</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#111827' }}>{parseFloat(totalAct.toFixed(1))}h</div>
           </div>
         </div>
       </div>
