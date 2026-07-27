@@ -24,7 +24,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
   const [estTimeInput, setEstTimeInput] = useState(
     initialTask?.estimatedHours ? formatHours(initialTask.estimatedHours) : ''
    );
-  const [suggestion, setSuggestion] = useState<{ hours: number; text: string } | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -65,37 +64,14 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
   const handleEstTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setEstTimeInput(value);
-    
-    const { hours, needsClarification } = parseEstimatedTime(value);
-    if (needsClarification && value.trim()) {
-      const parsedInt = parseInt(value.trim(), 10);
-      if (!isNaN(parsedInt)) {
-        setSuggestion({
-          hours: parsedInt,
-          text: `Did you mean ${parsedInt} hours or ${parsedInt} minutes?`
-        });
-      } else {
-        setSuggestion(null);
-      }
-    } else {
-      setSuggestion(null);
-      setFormData(prev => ({
-        ...prev,
-        estimatedHours: hours
-      }));
-    }
+    const { hours } = parseEstimatedTime(value);
+    setFormData(prev => ({ ...prev, estimatedHours: hours }));
   };
 
   const handleEstTimeBlur = () => {
-    // If the suggestion is still active, resolve it to hours (default fallback)
-    if (suggestion) {
-      setFormData(prev => ({ ...prev, estimatedHours: suggestion.hours }));
-      setEstTimeInput(`${suggestion.hours} hours`);
-      setSuggestion(null);
-    } else {
-      const { hours } = parseEstimatedTime(estTimeInput);
-      setEstTimeInput(hours > 0 ? formatHours(hours) : '');
-    }
+    const { hours } = parseEstimatedTime(estTimeInput);
+    setEstTimeInput(hours > 0 ? formatHours(hours) : '');
+    setFormData(prev => ({ ...prev, estimatedHours: hours }));
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -141,86 +117,18 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
               <option value="Critical">Critical</option>
             </select>
           </div>
-          <div style={{ flex: 1, position: 'relative' }}>
+          <div style={{ flex: 1 }}>
             <label style={labelStyle}>Estimated Time</label>
-            <input 
-              required 
-              type="text" 
-              placeholder="e.g. 4h 34m or 22" 
-              name="estimatedHours" 
-              value={estTimeInput} 
-              onChange={handleEstTimeChange} 
+            <input
+              required
+              type="text"
+              placeholder="e.g. 3 → 3h, 3.4 → 3h 40m, 30m"
+              name="estimatedHours"
+              value={estTimeInput}
+              onChange={handleEstTimeChange}
               onBlur={handleEstTimeBlur}
-              style={inputStyle} 
+              style={inputStyle}
             />
-            {suggestion && (
-              <div style={{
-                position: 'absolute',
-                left: 0,
-                right: 0,
-                top: '100%',
-                marginTop: '4px',
-                padding: '8px 12px',
-                backgroundColor: '#EFF6FF',
-                border: '1px solid #BFDBFE',
-                borderRadius: '6px',
-                fontSize: '0.7rem',
-                color: '#1E40AF',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px',
-                zIndex: 50,
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-              }}>
-                <span>{suggestion.text}</span>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => {
-                      // Use onMouseDown instead of onClick to run before input onBlur
-                      e.preventDefault();
-                      const cleanVal = `${suggestion.hours} hours`;
-                      setEstTimeInput(cleanVal);
-                      setFormData(prev => ({ ...prev, estimatedHours: suggestion.hours }));
-                      setSuggestion(null);
-                    }}
-                    style={{
-                      padding: '2px 8px',
-                      backgroundColor: '#3B82F6',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {suggestion.hours} hrs
-                  </button>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      const cleanVal = `${suggestion.hours} minutes`;
-                      setEstTimeInput(cleanVal);
-                      const minsAsHours = parseFloat((suggestion.hours / 60).toFixed(2));
-                      setFormData(prev => ({ ...prev, estimatedHours: minsAsHours }));
-                      setSuggestion(null);
-                    }}
-                    style={{
-                      padding: '2px 8px',
-                      backgroundColor: '#3B82F6',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {suggestion.hours} mins
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 

@@ -283,11 +283,9 @@ export const Tasks: React.FC = () => {
   } | null>(null);
   const [logTimeTaskId, setLogTimeTaskId] = useState<string | null>(null);
   const [manualTimeInput, setManualTimeInput] = useState('');
-  const [manualSuggestion, setManualSuggestion] = useState<{ hours: number; text: string } | null>(null);
 
   useEffect(() => {
     setManualTimeInput('');
-    setManualSuggestion(null);
   }, [logTimeTaskId]);
 
   const showToast = (message: string, type: 'error' | 'success' | 'info' = 'error') => {
@@ -314,86 +312,38 @@ export const Tasks: React.FC = () => {
   }, [location.search, navigate]);
 
   const [modalEstTimeInput, setModalEstTimeInput] = useState('');
-  const [modalSuggestion, setModalSuggestion] = useState<{ hours: number; text: string } | null>(null);
 
   useEffect(() => {
     if (activeDetailsTask) {
       setModalDraft(activeDetailsTask);
       setModalEstTimeInput(activeDetailsTask.estimatedHours ? formatHours(activeDetailsTask.estimatedHours) : '');
-      setModalSuggestion(null);
     } else {
       setModalDraft(null);
       setModalEstTimeInput('');
-      setModalSuggestion(null);
     }
   }, [activeDetailsTask]);
 
   const handleModalEstTimeChange = (value: string) => {
     setModalEstTimeInput(value);
-    
-    const { hours, needsClarification } = parseEstimatedTime(value);
-    if (needsClarification && value.trim()) {
-      const parsedInt = parseInt(value.trim(), 10);
-      if (!isNaN(parsedInt)) {
-        setModalSuggestion({
-          hours: parsedInt,
-          text: `Did you mean ${parsedInt} hours or ${parsedInt} minutes?`
-        });
-      } else {
-        setModalSuggestion(null);
-      }
-    } else {
-      setModalSuggestion(null);
-      if (modalDraft) {
-        setModalDraft({
-          ...modalDraft,
-          estimatedHours: hours
-        });
-      }
+    const { hours } = parseEstimatedTime(value);
+    if (modalDraft) {
+      setModalDraft({ ...modalDraft, estimatedHours: hours });
     }
   };
 
   const handleModalEstTimeBlur = () => {
-    if (modalSuggestion) {
-      const hours = modalSuggestion.hours;
-      setModalEstTimeInput(`${hours} hours`);
-      setModalSuggestion(null);
-      handleModalSave('estimatedHours', hours);
-    } else {
-      const { hours } = parseEstimatedTime(modalEstTimeInput);
-      setModalEstTimeInput(hours > 0 ? formatHours(hours) : '');
-      handleModalSave('estimatedHours', hours);
-    }
+    const { hours } = parseEstimatedTime(modalEstTimeInput);
+    setModalEstTimeInput(hours > 0 ? formatHours(hours) : '');
+    handleModalSave('estimatedHours', hours);
   };
 
   const handleManualTimeChange = (value: string) => {
     setManualTimeInput(value);
-    
-    const { needsClarification } = parseEstimatedTime(value);
-    if (needsClarification && value.trim()) {
-      const parsedInt = parseInt(value.trim(), 10);
-      if (!isNaN(parsedInt)) {
-        setManualSuggestion({
-          hours: parsedInt,
-          text: `Did you mean ${parsedInt} hours or ${parsedInt} minutes?`
-        });
-      } else {
-        setManualSuggestion(null);
-      }
-    } else {
-      setManualSuggestion(null);
-    }
   };
 
   const handleManualTimeBlur = () => {
-    if (manualSuggestion) {
-      const hours = manualSuggestion.hours;
-      setManualTimeInput(`${hours} hours`);
-      setManualSuggestion(null);
-    } else {
-      const { hours } = parseEstimatedTime(manualTimeInput);
-      setManualTimeInput(hours > 0 ? formatHours(hours) : '');
-    }
+    const { hours } = parseEstimatedTime(manualTimeInput);
+    setManualTimeInput(hours > 0 ? formatHours(hours) : '');
   };
 
   const handleModalSave = async (field: keyof Task, value: any) => {
@@ -427,6 +377,8 @@ export const Tasks: React.FC = () => {
 
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [inlineTaskTitle, setInlineTaskTitle] = useState('');
+  const [inlinePriority, setInlinePriority] = useState<'Low' | 'Medium' | 'High' | 'Critical'>('Medium');
+  const [inlineEstTime, setInlineEstTime] = useState('');
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -489,26 +441,35 @@ export const Tasks: React.FC = () => {
     }
   };
 
-  const handleInlineSubmit = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && inlineTaskTitle.trim()) {
-      try {
-        const today = new Date().toISOString().split('T')[0];
-        const newTask = await taskService.createTask({
-          title: inlineTaskTitle.trim(),
-          projectId: 'default',
-          assignedUserId: 'self',
-          priority: 'Medium',
-          estimatedHours: 1,
-          startDate: today,
-          dueDate: today,
-          status: 'Todo',
-          order: tasks.length
-        });
-        setTasks(prev => [...prev, newTask]);
-        setInlineTaskTitle('');
-      } catch (err) {
-        console.error("Failed to create inline task", err);
-      }
+  const addInlineTask = async () => {
+    if (!inlineTaskTitle.trim()) return;
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { hours } = parseEstimatedTime(inlineEstTime);
+      const newTask = await taskService.createTask({
+        title: inlineTaskTitle.trim(),
+        projectId: 'default',
+        assignedUserId: 'self',
+        priority: inlinePriority,
+        estimatedHours: hours > 0 ? hours : 1,
+        startDate: today,
+        dueDate: today,
+        status: 'Todo',
+        order: tasks.length
+      });
+      setTasks(prev => [...prev, newTask]);
+      setInlineTaskTitle('');
+      setInlinePriority('Medium');
+      setInlineEstTime('');
+      showToast('Task added!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to add task', 'error');
+    }
+  };
+
+  const handleInlineSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      addInlineTask();
     }
   };
 
@@ -810,17 +771,68 @@ export const Tasks: React.FC = () => {
                         <input type="checkbox" disabled style={{ opacity: 0.5 }} />
                         <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151' }}>+ Quick Add</span>
                       </td>
-                      <td colSpan={9} style={{ padding: '12px 0' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #E5E7EB', borderRadius: '6px', padding: '4px 8px', backgroundColor: '#FFFFFF', width: '90%' }}>
-                          <Plus size={14} color="#9CA3AF" />
-                          <input 
-                            type="text" 
-                            placeholder="Type task title and press Enter to add..." 
-                            value={inlineTaskTitle}
-                            onChange={(e) => setInlineTaskTitle(e.target.value)}
+                      <td colSpan={9} style={{ padding: '8px 0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          {/* Title Input */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #E5E7EB', borderRadius: '6px', padding: '4px 8px', backgroundColor: '#FFFFFF', flex: '1 1 200px', minWidth: '150px' }}>
+                            <Plus size={14} color="#9CA3AF" />
+                            <input
+                              type="text"
+                              placeholder="Task title… (Enter to add)"
+                              value={inlineTaskTitle}
+                              onChange={(e) => setInlineTaskTitle(e.target.value)}
+                              onKeyDown={handleInlineSubmit}
+                              style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.8125rem', color: '#111827', width: '100%' }}
+                            />
+                          </div>
+
+                          {/* Priority Dropdown */}
+                          <select
+                            value={inlinePriority}
+                            onChange={(e) => setInlinePriority(e.target.value as any)}
+                            style={{
+                              border: '1px solid #E5E7EB', borderRadius: '6px', padding: '5px 8px',
+                              fontSize: '0.8125rem', backgroundColor: '#FFFFFF', color: '#374151',
+                              outline: 'none', cursor: 'pointer', flexShrink: 0
+                            }}
+                          >
+                            <option value="Low">🟢 Low</option>
+                            <option value="Medium">🟡 Medium</option>
+                            <option value="High">🔴 High</option>
+                            <option value="Critical">⚠️ Critical</option>
+                          </select>
+
+                          {/* Est. Time Input */}
+                          <input
+                            type="text"
+                            placeholder="Time (e.g. 2h, 3.4)"
+                            value={inlineEstTime}
+                            onChange={(e) => setInlineEstTime(e.target.value)}
                             onKeyDown={handleInlineSubmit}
-                            style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.8125rem', color: '#111827', width: '100%' }}
+                            style={{
+                              border: '1px solid #E5E7EB', borderRadius: '6px', padding: '5px 8px',
+                              fontSize: '0.8125rem', backgroundColor: '#FFFFFF', color: '#374151',
+                              outline: 'none', width: '120px', flexShrink: 0
+                            }}
                           />
+
+                          {/* Add Button */}
+                          <button
+                            onClick={addInlineTask}
+                            disabled={!inlineTaskTitle.trim()}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '4px',
+                              backgroundColor: inlineTaskTitle.trim() ? '#2563EB' : '#E5E7EB',
+                              color: inlineTaskTitle.trim() ? '#FFFFFF' : '#9CA3AF',
+                              border: 'none', borderRadius: '6px',
+                              padding: '6px 12px', fontSize: '0.8125rem', fontWeight: 600,
+                              cursor: inlineTaskTitle.trim() ? 'pointer' : 'not-allowed',
+                              transition: 'all 0.15s ease', whiteSpace: 'nowrap', flexShrink: 0
+                            }}
+                          >
+                            <Plus size={14} />
+                            Add
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -931,73 +943,6 @@ export const Tasks: React.FC = () => {
                   onBlur={handleModalEstTimeBlur}
                   style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #E5E7EB', fontSize: '0.875rem', outline: 'none' }}
                 />
-                {modalSuggestion && (
-                  <div style={{
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    top: '100%',
-                    marginTop: '4px',
-                    padding: '8px 12px',
-                    backgroundColor: '#EFF6FF',
-                    border: '1px solid #BFDBFE',
-                    borderRadius: '6px',
-                    fontSize: '0.7rem',
-                    color: '#1E40AF',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                    zIndex: 50,
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                  }}>
-                    <span>{modalSuggestion.text}</span>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          const cleanVal = `${modalSuggestion.hours} hours`;
-                          setModalEstTimeInput(cleanVal);
-                          setModalSuggestion(null);
-                          handleModalSave('estimatedHours', modalSuggestion.hours);
-                        }}
-                        style={{
-                          padding: '2px 8px',
-                          backgroundColor: '#3B82F6',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontWeight: 500,
-                        }}
-                      >
-                        {modalSuggestion.hours} hrs
-                      </button>
-                      <button
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          const cleanVal = `${modalSuggestion.hours} minutes`;
-                          setModalEstTimeInput(cleanVal);
-                          const minsAsHours = parseFloat((modalSuggestion.hours / 60).toFixed(2));
-                          setModalSuggestion(null);
-                          handleModalSave('estimatedHours', minsAsHours);
-                        }}
-                        style={{
-                          padding: '2px 8px',
-                          backgroundColor: '#3B82F6',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontWeight: 500,
-                        }}
-                      >
-                        {modalSuggestion.hours} mins
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '4px', fontWeight: 600 }}>Logged Hours</div>
@@ -1201,71 +1146,6 @@ export const Tasks: React.FC = () => {
                   onBlur={handleManualTimeBlur}
                   style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #E5E7EB', fontSize: '0.875rem', outline: 'none' }} 
                 />
-                
-                {manualSuggestion && (
-                  <div style={{
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    top: '100%',
-                    marginTop: '4px',
-                    padding: '8px 12px',
-                    backgroundColor: '#EFF6FF',
-                    border: '1px solid #BFDBFE',
-                    borderRadius: '6px',
-                    fontSize: '0.7rem',
-                    color: '#1E40AF',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                    zIndex: 50,
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                  }}>
-                    <span>{manualSuggestion.text}</span>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          const val = `${manualSuggestion.hours} hours`;
-                          setManualTimeInput(val);
-                          setManualSuggestion(null);
-                        }}
-                        style={{
-                          padding: '2px 8px',
-                          backgroundColor: '#4F46E5',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontWeight: 500,
-                        }}
-                      >
-                        {manualSuggestion.hours} hrs
-                      </button>
-                      <button
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          const val = `${manualSuggestion.hours} minutes`;
-                          setManualTimeInput(val);
-                          setManualSuggestion(null);
-                        }}
-                        style={{
-                          padding: '2px 8px',
-                          backgroundColor: '#3B82F6',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontWeight: 500,
-                        }}
-                      >
-                        {manualSuggestion.hours} mins
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
               <div style={{ marginBottom: '24px' }}>
                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', marginBottom: '4px' }}>Notes</label>

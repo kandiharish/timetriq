@@ -51,7 +51,8 @@ export const taskService = {
       return data.filter(t => t.title && t.title.trim() !== '');
     } catch (e) {
       console.warn("Backend not available, using personal local storage.");
-      const data: Task[] = JSON.parse(localStorage.getItem('timetriq_tasks') || '[]');
+      const uid = auth.currentUser?.uid || 'guest';
+      const data: Task[] = JSON.parse(localStorage.getItem(`timetriq_tasks_${uid}`) || '[]');
       return data.filter(t => t.title && t.title.trim() !== '');
     }
   },
@@ -77,10 +78,12 @@ export const taskService = {
       if (task.status === 'Completed') {
         throw new Error('Cannot mark task as Completed without logging hours first.');
       }
-      const tasks = JSON.parse(localStorage.getItem('timetriq_tasks') || '[]');
+      const uid = auth.currentUser?.uid || 'guest';
+      const key = `timetriq_tasks_${uid}`;
+      const tasks = JSON.parse(localStorage.getItem(key) || '[]');
       const newTask: Task = { ...task, id: Date.now().toString(), status: task.status || 'Todo', actualHours: 0 };
       tasks.push(newTask);
-      localStorage.setItem('timetriq_tasks', JSON.stringify(tasks));
+      localStorage.setItem(key, JSON.stringify(tasks));
       return newTask;
     }
   },
@@ -101,9 +104,11 @@ export const taskService = {
         throw e;
       }
       console.warn("Backend not available, deleting from personal local storage.");
-      let tasks = JSON.parse(localStorage.getItem('timetriq_tasks') || '[]');
+      const uid = auth.currentUser?.uid || 'guest';
+      const key = `timetriq_tasks_${uid}`;
+      let tasks = JSON.parse(localStorage.getItem(key) || '[]');
       tasks = tasks.filter((t: any) => t.id !== id);
-      localStorage.setItem('timetriq_tasks', JSON.stringify(tasks));
+      localStorage.setItem(key, JSON.stringify(tasks));
     }
   },
 
@@ -125,19 +130,19 @@ export const taskService = {
         throw e;
       }
       console.warn("Backend not available, updating in personal local storage.");
-      let tasks = JSON.parse(localStorage.getItem('timetriq_tasks') || '[]');
+      const uid = auth.currentUser?.uid || 'guest';
+      const key = `timetriq_tasks_${uid}`;
+      let tasks = JSON.parse(localStorage.getItem(key) || '[]');
       const index = tasks.findIndex((t: any) => t.id === id);
       if (index !== -1) {
         const existingTask = tasks[index];
         const newStatus = task.status;
         const actualHours = (task as any).actualHours !== undefined ? (task as any).actualHours : existingTask.actualHours;
-        
         if (newStatus === 'Completed' && (!actualHours || actualHours <= 0)) {
           throw new Error('Cannot mark task as Completed without logging hours first.');
         }
-        
         tasks[index] = { ...existingTask, ...task };
-        localStorage.setItem('timetriq_tasks', JSON.stringify(tasks));
+        localStorage.setItem(key, JSON.stringify(tasks));
         return tasks[index];
       }
       throw new Error('Task not found in local storage');

@@ -8,29 +8,34 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Parses a string representation of time into decimal hours.
  * Supported formats:
- * - "4h 34m", "4 hours 34 minutes", "4 hour 34 min", "4 hrs 34 mins", etc.
+ * - "4h 34m", "4 hours 34 minutes", "4 hour 34 min", etc.
  * - "2h", "2 hours", "2 hr"
  * - "30m", "30 minutes", "30 min"
- * - "2.5" -> 2.5 hours
- * - "22" -> needs clarification (handled by UI suggesting hours/minutes)
+ * - "3"   → 3 hours (bare integers default to hours)
+ * - "3.4" → 3 hours 40 minutes (decimal part × 100 = minutes, e.g. .4 = 40 min)
+ * - "2.5" → 2 hours 30 minutes
  */
 export function parseEstimatedTime(input: string): { hours: number; needsClarification: boolean; cleanText: string } {
   const text = input.trim().toLowerCase();
-  
+
   if (!text) {
     return { hours: 0, needsClarification: false, cleanText: '' };
   }
 
-  // 1. Check if it's a simple number (integer or float)
-  const numericMatch = text.match(/^(\d+(?:\.\d+)?)$/);
+  // 1. Check if it's a plain number (integer or decimal)
+  const numericMatch = text.match(/^(\d+)(?:\.(\d+))?$/);
   if (numericMatch) {
-    const val = parseFloat(numericMatch[1]);
-    // If it contains a decimal point, assume hours (e.g. 2.5)
-    if (text.includes('.')) {
-      return { hours: val, needsClarification: false, cleanText: formatHours(val) };
+    const wholeHours = parseInt(numericMatch[1], 10);
+    if (numericMatch[2] !== undefined) {
+      // Decimal notation: treat decimal part as minute tens-place
+      // e.g. 3.4 → 3h 40m, 1.5 → 1h 50m, 0.3 → 0h 30m
+      const decimalPart = numericMatch[2].padEnd(2, '0').slice(0, 2); // normalise to 2 digits
+      const minutes = parseInt(decimalPart, 10);
+      const totalHours = wholeHours + minutes / 60;
+      return { hours: parseFloat(totalHours.toFixed(4)), needsClarification: false, cleanText: formatHours(totalHours) };
     }
-    // If it is just an integer (e.g. 22), it needs clarification (hours vs minutes)
-    return { hours: val, needsClarification: true, cleanText: text };
+    // Bare integer → treat as hours (no clarification needed)
+    return { hours: wholeHours, needsClarification: false, cleanText: formatHours(wholeHours) };
   }
 
   // 2. Parse patterns with explicit units
@@ -66,18 +71,18 @@ export function parseEstimatedTime(input: string): { hours: number; needsClarifi
   if (matched) {
     const totalHours = hours + minutes / 60;
     return {
-      hours: parseFloat(totalHours.toFixed(2)),
+      hours: parseFloat(totalHours.toFixed(4)),
       needsClarification: false,
       cleanText: formatHours(totalHours)
     };
   }
 
-  // Fallback: parse as float
+  // Fallback: try parsing as float (handles locale-independent floats)
   const fallback = parseFloat(text);
   if (isNaN(fallback)) {
     return { hours: 0, needsClarification: false, cleanText: '' };
   }
-  return { hours: fallback, needsClarification: false, cleanText: `${fallback} hours` };
+  return { hours: fallback, needsClarification: false, cleanText: formatHours(fallback) };
 }
 
 export function formatHours(hours: number): string {

@@ -70,85 +70,98 @@ export const Workload: React.FC = () => {
     const taskData: { task: Task; totalHours: number; daily: Record<string, number> }[] = [];
     const totals: Record<string, number> = {};
 
-    // Initialize daily totals map
+    /** Stable local YYYY-MM-DD key from any Date object */
+    const toKey = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    /** Parse a YYYY-MM-DD string into local midnight Date (avoids UTC offset shift) */
+    const parseLocal = (s: string) => {
+      const [y, m, d] = s.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      dt.setHours(0, 0, 0, 0);
+      return dt;
+    };
+
+    // Initialize daily totals map using YYYY-MM-DD keys
     timelineDays.forEach(day => {
-      totals[day.toISOString()] = 0;
+      totals[toKey(day)] = 0;
     });
 
     tasks.forEach(task => {
-      if (task.status === 'Completed') return; 
+      if (task.status === 'Completed') return;
 
       const actual = task.actualHours || 0;
       const remaining = Math.max(task.estimatedHours - actual, 0);
       if (remaining === 0) return;
 
-      let start = new Date(task.startDate || task.dueDate || today);
-      let end = new Date(task.dueDate || task.startDate || today);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(0, 0, 0, 0);
+      // Parse dates safely as local midnight (not UTC)
+      let start = parseLocal(task.startDate || task.dueDate || toKey(today));
+      let end = parseLocal(task.dueDate || task.startDate || toKey(today));
 
       if (start > end) {
-        const temp = start;
-        start = end;
-        end = temp;
+        const temp = start; start = end; end = temp;
       }
 
-      // Count valid weekdays
+      // Count valid weekdays (Mon–Fri) in the task's full range
       let validDaysCount = 0;
-      const validDates: string[] = [];
-      
-      let current = new Date(start);
+      const validKeys: string[] = [];
+
+      const current = new Date(start);
       while (current <= end) {
         const dayOfWeek = current.getDay();
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Exclude weekends
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) { // exclude Sat & Sun
           validDaysCount++;
-          validDates.push(current.toISOString());
+          validKeys.push(toKey(current));
         }
         current.setDate(current.getDate() + 1);
       }
 
-      // If due on a weekend and started on a weekend, default to 1 day
+      // Fallback: if task falls entirely on a weekend, count as 1 day
       if (validDaysCount === 0) {
         validDaysCount = 1;
-        validDates.push(start.toISOString());
+        validKeys.push(toKey(start));
       }
 
-      const hoursPerDay = Number((remaining / validDaysCount).toFixed(1));
-      
+      const hoursPerDay = Number((remaining / validDaysCount).toFixed(2));
+
       const dailyRecord: Record<string, number> = {};
       let taskTotalInWindow = 0;
 
-      validDates.forEach(dateStr => {
-        // Only add if date is within 14-day window
-        if (totals[dateStr] !== undefined) {
-          dailyRecord[dateStr] = hoursPerDay;
+      validKeys.forEach(key => {
+        // Only add if this day is within the current 14-day window
+        if (totals[key] !== undefined) {
+          dailyRecord[key] = hoursPerDay;
           taskTotalInWindow += hoursPerDay;
-          totals[dateStr] += hoursPerDay;
+          totals[key] += hoursPerDay;
         }
       });
 
-      // Only include tasks that actually fall in this 14-day window
+      // Round totals to avoid floating-point display noise
+      Object.keys(totals).forEach(k => { totals[k] = parseFloat(totals[k].toFixed(2)); });
+
       if (taskTotalInWindow > 0) {
         taskData.push({
           task,
-          totalHours: taskTotalInWindow,
+          totalHours: parseFloat(taskTotalInWindow.toFixed(2)),
           daily: dailyRecord
         });
       }
     });
 
-    // Sort tasks by total hours descending, then by dueDate
+    // Sort by total hours descending
     taskData.sort((a, b) => b.totalHours - a.totalHours);
 
     return { taskWorkload: taskData, dailyTotals: totals };
   }, [tasks, timelineDays, today]);
+
 
   // SMART INSIGHTS
   const overbookedDays = useMemo(() => {
     const overbooked: { date: Date; hours: number }[] = [];
     Object.entries(dailyTotals).forEach(([dateStr, hours]) => {
       if (hours > 8) { // 8h total personal limit
-        overbooked.push({ date: new Date(dateStr), hours });
+        const [y, m, d] = dateStr.split('-').map(Number);
+        overbooked.push({ date: new Date(y, m - 1, d), hours });
       }
     });
     return overbooked;
@@ -157,17 +170,19 @@ export const Workload: React.FC = () => {
   const underUtilizedDays = useMemo(() => {
     const underUtilized: { date: Date; hours: number }[] = [];
     Object.entries(dailyTotals).forEach(([dateStr, hours]) => {
-      const d = new Date(dateStr);
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
       // Only look at weekdays in the future (or today)
-      if (d.getDay() !== 0 && d.getDay() !== 6 && d >= today) {
+      if (dt.getDay() !== 0 && dt.getDay() !== 6 && dt >= today) {
         if (hours < 4) { // Less than 4 hours booked
-          underUtilized.push({ date: d, hours });
+          underUtilized.push({ date: dt, hours });
         }
       }
     });
     // Sort by date and take first 3
     return underUtilized.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 3);
   }, [dailyTotals, today]);
+
 
   const topTasks = useMemo(() => {
     return taskWorkload.slice(0, 5); // top 5 heaviest tasks
@@ -231,7 +246,7 @@ export const Workload: React.FC = () => {
             </div>
             
             {timelineDays.map((d, i) => {
-              const dateStr = d.toISOString();
+              const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
               const isToday = d.getTime() === today.getTime();
               const isWeekend = d.getDay() === 0 || d.getDay() === 6;
               const dayTotal = dailyTotals[dateStr] || 0;
@@ -307,7 +322,7 @@ export const Workload: React.FC = () => {
                     {/* Heatmap Cells */}
                     {timelineDays.map((d, i) => {
                       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                      const dateStr = d.toISOString();
+                      const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                       const hours = daily[dateStr] || 0;
                       const styleInfo = getCellColor(hours);
                       
