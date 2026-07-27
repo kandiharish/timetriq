@@ -121,6 +121,7 @@ export const TimerProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           hours_worked: hoursWorked,
           notes: 'Time logged via task timer'
         });
+        window.dispatchEvent(new Event('timeEntryAdded'));
       } catch (e) {
         console.error("Failed to save time entry", e);
       }

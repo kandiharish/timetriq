@@ -37,7 +37,13 @@ export const Dashboard: React.FC = () => {
         setLoading(false);
       }
     };
+    
     fetchData();
+
+    window.addEventListener('timeEntryAdded', fetchData);
+    return () => {
+      window.removeEventListener('timeEntryAdded', fetchData);
+    };
   }, []);
 
   if (loading) return <div style={{ padding: 'var(--spacing-8)' }}>Loading your dashboard...</div>;

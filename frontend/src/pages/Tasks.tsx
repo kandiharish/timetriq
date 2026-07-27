@@ -401,6 +401,13 @@ export const Tasks: React.FC = () => {
 
   useEffect(() => {
     fetchTasks();
+    const handleTimeEntryAdded = () => {
+      fetchTasks();
+    };
+    window.addEventListener('timeEntryAdded', handleTimeEntryAdded);
+    return () => {
+      window.removeEventListener('timeEntryAdded', handleTimeEntryAdded);
+    };
   }, []);
 
   const sensors = useSensors(
