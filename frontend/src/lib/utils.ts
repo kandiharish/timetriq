@@ -113,3 +113,11 @@ export function formatHoursCompact(hours: number): string {
   }
 }
 
+export function formatDurationHMS(hours: number): string {
+  if (!hours || hours <= 0) return '-';
+  const h = Math.floor(hours);
+  const totalMinutes = Math.round((hours - h) * 60);
+  const m = totalMinutes;
+  const s = 0; // Our current schema tracks hours down to minutes, seconds will be 0.
+  return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}

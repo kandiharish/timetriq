@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { dashboardService, type DashboardMetrics } from '../services/dashboardService';
 import { taskService, type Task } from '../services/taskService';
 import { timeService, type TimeEntry } from '../services/timeService';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector } from 'recharts';
 import { ClipboardList, Clock, Activity } from 'lucide-react';
 import { useAuth } from '../components/AuthContext';
 
@@ -13,6 +13,7 @@ export const Dashboard: React.FC = () => {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activePieIndex, setActivePieIndex] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -65,8 +66,24 @@ export const Dashboard: React.FC = () => {
   
   const statusCounts = { 'Todo': 0, 'In Progress': 0, 'Review': 0, 'Completed': 0 };
   tasks.forEach(t => { if (t.status in statusCounts) statusCounts[t.status as keyof typeof statusCounts]++; });
-  const pieData = Object.entries(statusCounts).filter(([_,v]) => v>0).map(([name, value]) => ({ name, value }));
-  const COLORS = ['#9CA3AF', '#3B82F6', '#8B5CF6', '#10B981'];
+  const pieData = Object.entries(statusCounts)
+    .filter(([_,v]) => v>0)
+    .map(([name, value]) => {
+      let displayName = name.toUpperCase();
+      if (name === 'Review') displayName = 'PENDING FROM REVIEWER';
+      if (name === 'Todo') displayName = 'TO DO';
+      return { name: displayName, value };
+    });
+    
+  const getStatusChartColor = (name: string) => {
+    switch(name) {
+      case 'IN PROGRESS': return '#6366f1';
+      case 'TO DO': return '#8c92a1';
+      case 'PENDING FROM REVIEWER': return '#a78bfa';
+      case 'COMPLETED': return '#10b981';
+      default: return '#9ca3af';
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch(status) {
@@ -80,6 +97,51 @@ export const Dashboard: React.FC = () => {
   const EmptyState = ({ message = "No Results" }) => (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-secondary)', fontSize: '0.875rem', padding: '24px 0' }}>{message}</div>
   );
+
+  const renderActiveShape = (props: any) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+    return (
+      <g>
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius + 10}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          fill={fill}
+        />
+      </g>
+    );
+  };
+
+  const renderCustomizedLabel = (props: any) => {
+    const { cx, cy, midAngle, outerRadius, value, name } = props;
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius + 20;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    
+    // Draw a line from the pie to the label
+    const lineX = cx + (outerRadius + 10) * Math.cos(-midAngle * RADIAN);
+    const lineY = cy + (outerRadius + 10) * Math.sin(-midAngle * RADIAN);
+    
+    return (
+      <g>
+        <polyline points={`${cx + outerRadius * Math.cos(-midAngle * RADIAN)},${cy + outerRadius * Math.sin(-midAngle * RADIAN)} ${lineX},${lineY} ${x},${lineY}`} stroke="#9ca3af" fill="none" />
+        <text 
+          x={x + (x > cx ? 5 : -5)} 
+          y={lineY} 
+          fill="#374151" 
+          textAnchor={x > cx ? 'start' : 'end'} 
+          dominantBaseline="central"
+          fontSize="10px"
+          fontWeight="700"
+        >
+          {name} <span style={{ fontWeight: 'normal' }}>{value}</span>
+        </text>
+      </g>
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-6)' }}>
@@ -144,11 +206,27 @@ export const Dashboard: React.FC = () => {
           {/* Workload by Status Pie */}
           <div style={cardStyle}>
             <div style={headerStyle}>Workload by Status</div>
-            <div style={{ height: '180px' }}>
+            <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={pieData} innerRadius={50} outerRadius={70} paddingAngle={2} dataKey="value" stroke="none">
-                    {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  <Pie 
+                    data={pieData} 
+                    cx="50%" 
+                    cy="50%" 
+                    innerRadius={0} 
+                    outerRadius={65} 
+                    paddingAngle={0} 
+                    dataKey="value" 
+                    stroke="#ffffff"
+                    strokeWidth={2}
+                    activeIndex={activePieIndex}
+                    activeShape={renderActiveShape}
+                    onMouseEnter={(_, index) => setActivePieIndex(index)}
+                    onMouseLeave={() => setActivePieIndex(undefined)}
+                    label={renderCustomizedLabel}
+                    labelLine={false}
+                  >
+                    {pieData.map((entry, i) => <Cell key={i} fill={getStatusChartColor(entry.name)} />)}
                   </Pie>
                   <Tooltip />
                 </PieChart>
