@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../core/firebase';
+import { isAllowedDomain } from '../utils/auth';
 
 export const Login: React.FC = () => {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -16,11 +17,21 @@ export const Login: React.FC = () => {
       setError(null);
       setLoading(true);
       if (isRegistering) {
+        if (!isAllowedDomain(email)) {
+          setError('Only Verve Advisory email accounts are allowed.');
+          setLoading(false);
+          return;
+        }
         await createUserWithEmailAndPassword(auth, email, password);
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        if (!isAllowedDomain(credential.user.email)) {
+          await auth.signOut();
+          setError('Unauthorized email domain. Access denied.');
+          setLoading(false);
+          return;
+        }
       }
-      // Navigation will be handled by the route guard in App.tsx
     } catch (err: any) {
       if (err.code === 'auth/email-already-in-use') {
         setError('An account with this email already exists.');
@@ -41,7 +52,14 @@ export const Login: React.FC = () => {
       setError(null);
       setLoading(true);
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const credential = await signInWithPopup(auth, provider);
+      
+      if (!isAllowedDomain(credential.user.email)) {
+        await auth.signOut();
+        setError('Access denied. Please sign in using your Verve Advisory account.');
+        setLoading(false);
+        return;
+      }
     } catch (err: any) {
       setError('Failed to log in with Google.');
     } finally {
@@ -52,7 +70,10 @@ export const Login: React.FC = () => {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: 'var(--color-background)' }}>
       <div style={{ backgroundColor: 'var(--color-surface)', padding: 'var(--spacing-8)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', width: '100%', maxWidth: '400px' }}>
-        <h1 style={{ marginBottom: 'var(--spacing-6)', textAlign: 'center', color: 'var(--color-text-primary)' }}>Timetriq</h1>
+        <h1 style={{ marginBottom: 'var(--spacing-2)', textAlign: 'center', color: 'var(--color-text-primary)' }}>Welcome to Timetriq</h1>
+        <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-6)', fontSize: '0.875rem' }}>
+          Sign in using your Verve Advisory account.
+        </p>
         
         {error && <div style={{ backgroundColor: '#fee2e2', color: 'var(--color-error)', padding: 'var(--spacing-3)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-4)', fontSize: '0.875rem' }}>{error}</div>}
         
@@ -139,6 +160,10 @@ export const Login: React.FC = () => {
           >
             {isRegistering ? 'Log in' : 'Sign up'}
           </button>
+        </div>
+        
+        <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '0.75rem', color: '#9CA3AF' }}>
+          Only @verveadvisory.com email accounts are permitted.
         </div>
       </div>
     </div>
