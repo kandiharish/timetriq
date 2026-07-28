@@ -1,9 +1,15 @@
-from app.core.firebase import db
+import app.core.firebase as firebase
 from app.models.settings import UserSettings, UserSettingsUpdate
 
 COLLECTION_NAME = "settings"
 
+def _get_db():
+    if not firebase.db:
+        firebase.init_firebase()
+    return firebase.db
+
 def get_user_settings(user_id: str) -> UserSettings:
+    db = _get_db()
     doc_ref = db.collection(COLLECTION_NAME).document(user_id)
     doc = doc_ref.get()
     
@@ -16,6 +22,7 @@ def get_user_settings(user_id: str) -> UserSettings:
     return UserSettings(user_id=user_id)
 
 def update_user_settings(user_id: str, settings_update: UserSettingsUpdate) -> UserSettings:
+    db = _get_db()
     doc_ref = db.collection(COLLECTION_NAME).document(user_id)
     
     update_data = {

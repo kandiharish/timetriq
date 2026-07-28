@@ -40,9 +40,15 @@ export const Dashboard: React.FC = () => {
   if (error || !metrics) return <div style={{ padding: 'var(--spacing-8)', color: 'var(--color-error)' }}>{error || 'Failed to load'}</div>;
 
   const totalTasks = tasks.length;
-  const plannedHours = parseFloat(tasks.reduce((acc, t) => acc + t.estimatedHours, 0).toFixed(2));
-  const loggedHours = parseFloat(timeEntries.reduce((acc, e) => acc + e.hours_worked, 0).toFixed(2));
-  const remainingCapacity = parseFloat(Math.max(metrics.weekly_capacity - loggedHours, 0).toFixed(2));
+  const plannedHoursTotal = tasks.reduce((acc, t) => acc + (Number(t.estimatedHours) || 0), 0);
+  const plannedHours = parseFloat(plannedHoursTotal.toFixed(2));
+  
+  const loggedHoursTotal = timeEntries.reduce((acc, e) => acc + (Number(e.hours_worked) || 0), 0);
+  const loggedHours = parseFloat(loggedHoursTotal.toFixed(2));
+  
+  const weeklyCap = Number(metrics.weekly_capacity) || 40;
+  const remainingCapacity = parseFloat(Math.max(weeklyCap - loggedHoursTotal, 0).toFixed(2));
+  
   const avgProgress = totalTasks > 0 ? Math.round((tasks.filter(t => t.status === 'Completed').length / totalTasks) * 100) : 0;
 
   // Banner Styles
