@@ -3,7 +3,7 @@ import { dashboardService, type DashboardMetrics } from '../services/dashboardSe
 import { taskService, type Task } from '../services/taskService';
 import { timeService, type TimeEntry } from '../services/timeService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { ClipboardList, Clock, Activity, Plus } from 'lucide-react';
+import { ClipboardList, Clock, Activity } from 'lucide-react';
 import { useAuth } from '../components/AuthContext';
 
 export const Dashboard: React.FC = () => {
