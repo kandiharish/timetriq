@@ -4,10 +4,9 @@ import { taskService, type Task } from '../services/taskService';
 import { timeService, type TimeEntry } from '../services/timeService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector } from 'recharts';
 import { ClipboardList, Clock, Activity } from 'lucide-react';
-import { useAuth } from '../components/AuthContext';
+import { TimesheetGrid } from '../components/TimesheetGrid';
 
 export const Dashboard: React.FC = () => {
-  const { user } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
@@ -241,22 +240,13 @@ export const Dashboard: React.FC = () => {
         <h2 style={{ fontSize: '1rem', fontWeight: 600, margin: '0 0 8px 0', marginTop: '16px' }}>Daily Overview</h2>
         <div style={{ ...bannerStyle, backgroundColor: '#F9FAFB', color: '#374151', border: '1px solid #E5E7EB' }}>This will help to understand the totality of the work that a person has TODAY.</div>
         
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-          <div style={cardStyle}>
-            <div style={headerStyle}>Timesheet</div>
-            {timeEntries.filter(e => e.date === todayStr).length > 0 ? (
-               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 500, borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                   <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{user?.displayName?.[0] || 'U'}</div>
-                   <span>{user?.displayName || 'Me'}</span>
-                 </div>
-                 <span style={{ fontWeight: 600 }}>{timeEntries.filter(e => e.date === todayStr).reduce((a,b) => a + b.hours_worked, 0).toFixed(2)} h</span>
-               </div>
-            ) : <EmptyState />}
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
           <div style={cardStyle}>
             <div style={headerStyle}>Work Done today</div>
             <EmptyState />
+          </div>
+          <div style={{ padding: '24px 0' }}>
+            <TimesheetGrid />
           </div>
         </div>
       </div>
