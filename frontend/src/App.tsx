@@ -10,7 +10,7 @@ import { TimerProvider } from './context/TimerContext';
 import { NotificationProvider } from './context/NotificationContext';
 import './index.css';
 import { Toaster } from 'react-hot-toast';
-import { initializeServiceWorker, setupMessageListener, requestNotificationPermission } from './services/notificationService';
+import { initializeServiceWorker, requestNotificationPermission } from './services/notificationService';
 
 import { TimeEntries } from './pages/TimeEntries';
 

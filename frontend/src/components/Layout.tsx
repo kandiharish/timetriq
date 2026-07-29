@@ -6,7 +6,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { 
   LayoutDashboard, CheckSquare, Calendar, Clock, 
   BarChart2, Settings as SettingsIcon,
-  Search, Bell, ChevronDown, Hexagon,
+  Search, Bell, ChevronDown,
   PieChart, Activity, TrendingUp, Briefcase, Plus, X
 } from 'lucide-react';
 
