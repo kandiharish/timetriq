@@ -68,8 +68,28 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: 'var(--color-background)' }}>
-      <div style={{ backgroundColor: 'var(--color-surface)', padding: 'var(--spacing-8)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', width: '100%', maxWidth: '400px' }}>
+    <div style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      height: '100vh', 
+      backgroundImage: 'url("/timetriq%20logo.png")',
+      backgroundSize: '400px',
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: 'center',
+      backgroundColor: '#f3f4f6' 
+    }}>
+      <div style={{ 
+        backgroundColor: 'rgba(255, 255, 255, 0.7)', 
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        padding: 'var(--spacing-8)', 
+        borderRadius: 'var(--radius-lg)', 
+        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)', 
+        border: '1px solid rgba(255, 255, 255, 0.4)',
+        width: '100%', 
+        maxWidth: '400px' 
+      }}>
         <h1 style={{ marginBottom: 'var(--spacing-2)', textAlign: 'center', color: 'var(--color-text-primary)' }}>Welcome to Timetriq</h1>
         <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-6)', fontSize: '0.875rem' }}>
           Sign in using your Verve Advisory account.

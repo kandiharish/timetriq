@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { useTimer } from '../context/TimerContext';
+import { useNotifications } from '../context/NotificationContext';
 import { 
   LayoutDashboard, CheckSquare, Calendar, Clock, 
   BarChart2, Settings as SettingsIcon,
@@ -13,12 +14,16 @@ export const Layout: React.FC = () => {
   const { logout } = useAuth();
   const location = useLocation();
   const { timers, stopTimer, getLiveElapsedSeconds, focusSession, stopFocus } = useTimer();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useNotifications();
   
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   
   const [showTimersDropdown, setShowTimersDropdown] = useState(false);
   const timersDropdownRef = useRef<HTMLDivElement>(null);
+  
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -27,6 +32,9 @@ export const Layout: React.FC = () => {
       }
       if (timersDropdownRef.current && !timersDropdownRef.current.contains(event.target as Node)) {
         setShowTimersDropdown(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -109,7 +117,9 @@ export const Layout: React.FC = () => {
       }}>
         {/* Logo Area */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-3)', padding: '0 var(--spacing-2)', marginBottom: 'var(--spacing-6)' }}>
-          <div style={{ color: 'var(--color-primary)', display: 'flex' }}><Hexagon size={24} fill="currentColor" /></div>
+          <div style={{ display: 'flex' }}>
+            <img src="/timetriq%20logo.png" alt="Timetriq" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
+          </div>
           <div>
             <div style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--color-sidebar-text-active)', lineHeight: 1.2 }}>Timetriq</div>
             <div style={{ fontSize: '0.7rem', color: 'var(--color-sidebar-text)', fontWeight: 500 }}>Work Intelligence Platform</div>
@@ -394,9 +404,71 @@ export const Layout: React.FC = () => {
 
             <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--color-border)', margin: '0 8px' }}></div>
 
-            <div style={{ position: 'relative', cursor: 'pointer' }}>
-              <Bell size={20} color="var(--color-text-secondary)" />
-              <div style={{ position: 'absolute', top: '0', right: '0', width: '8px', height: '8px', backgroundColor: 'var(--color-error)', borderRadius: '50%', border: '2px solid var(--color-surface)' }}></div>
+            <div style={{ position: 'relative' }} ref={notificationsRef}>
+              <div 
+                style={{ cursor: 'pointer', padding: '4px' }} 
+                onClick={() => setShowNotifications(!showNotifications)}
+              >
+                <Bell size={20} color="var(--color-text-secondary)" />
+                {unreadCount > 0 && (
+                  <div style={{ position: 'absolute', top: '0', right: '0', width: '8px', height: '8px', backgroundColor: 'var(--color-error)', borderRadius: '50%', border: '2px solid var(--color-surface)' }}></div>
+                )}
+              </div>
+
+              {showNotifications && (
+                <div style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '100%',
+                  marginTop: '8px',
+                  backgroundColor: 'white',
+                  borderRadius: '8px',
+                  border: '1px solid var(--color-border)',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                  minWidth: '320px',
+                  zIndex: 100,
+                  overflow: 'hidden'
+                }}>
+                  <div style={{ padding: '12px 16px', borderBottom: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827' }}>Notifications</span>
+                    {notifications.length > 0 && (
+                      <button onClick={markAllAsRead} style={{ fontSize: '0.75rem', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Mark all read</button>
+                    )}
+                  </div>
+                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: '32px 16px', textAlign: 'center', color: '#6B7280', fontSize: '0.875rem' }}>
+                        No notifications yet
+                      </div>
+                    ) : (
+                      notifications.map(notif => (
+                        <div 
+                          key={notif.id} 
+                          onClick={() => markAsRead(notif.id)}
+                          style={{ 
+                            padding: '12px 16px', 
+                            borderBottom: '1px solid #F3F4F6',
+                            backgroundColor: notif.read ? 'white' : '#F9FAFB',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', marginBottom: '4px' }}>{notif.title}</div>
+                          <div style={{ fontSize: '0.8125rem', color: '#4B5563' }}>{notif.body}</div>
+                          <div style={{ fontSize: '0.7rem', color: '#9CA3AF', marginTop: '6px' }}>{notif.timestamp.toLocaleTimeString()}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {notifications.length > 0 && (
+                    <div 
+                      onClick={clearAll}
+                      style={{ padding: '8px', textAlign: 'center', borderTop: '1px solid #F3F4F6', fontSize: '0.75rem', color: '#6B7280', cursor: 'pointer', backgroundColor: '#F9FAFB' }}
+                    >
+                      Clear All
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             
             {/* User Account Dropdown */}

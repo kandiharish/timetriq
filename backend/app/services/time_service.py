@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime, timezone
 from app.models.time_entry import TimeEntryCreate, TimeEntryUpdate, TimeEntryInDB
 from app.services.task_service import get_task
@@ -10,6 +10,7 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 def _get_db() -> Client:
     if not firebase.db:
         firebase.init_firebase()
+    assert firebase.db is not None
     return firebase.db
 
 def create_time_entry(user_id: str, entry_in: TimeEntryCreate) -> TimeEntryInDB:
@@ -38,11 +39,18 @@ def create_time_entry(user_id: str, entry_in: TimeEntryCreate) -> TimeEntryInDB:
     
     doc_ref.set(db_payload)
     
-    # Update actualHours on parent task
-    task_ref = db.collection('tasks').document(entry_in.task_id)
-    task_ref.update({
+    # Update actualHours on parent task, and check if it should auto-complete
+    new_actual_hours = task.actualHours + entry_in.hours_worked
+    updates: dict[str, Any] = {
         'actualHours': Increment(entry_in.hours_worked)
-    })
+    }
+    
+    if task.estimatedHours > 0 and new_actual_hours >= task.estimatedHours and task.status != 'Completed':
+        updates['status'] = 'Completed'
+        updates['completedDate'] = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        
+    task_ref = db.collection('tasks').document(entry_in.task_id)
+    task_ref.update(updates)
     
     return entry
 
@@ -53,7 +61,8 @@ def get_time_entries_for_task(user_id: str, task_id: str) -> List[TimeEntryInDB]
     
     entries = []
     for doc in docs:
-        entries.append(TimeEntryInDB(**doc.to_dict()))
+        doc_data = doc.to_dict() or {}
+        entries.append(TimeEntryInDB(**doc_data))
     return entries
 
 def get_all_time_entries(user_id: str) -> List[TimeEntryInDB]:
@@ -62,7 +71,8 @@ def get_all_time_entries(user_id: str) -> List[TimeEntryInDB]:
     
     entries = []
     for doc in docs:
-        entries.append(TimeEntryInDB(**doc.to_dict()))
+        doc_data = doc.to_dict() or {}
+        entries.append(TimeEntryInDB(**doc_data))
     return entries
 
 def delete_time_entry(user_id: str, entry_id: str) -> bool:
@@ -71,7 +81,7 @@ def delete_time_entry(user_id: str, entry_id: str) -> bool:
     doc = doc_ref.get()
     
     if doc.exists:
-        data = doc.to_dict()
+        data = doc.to_dict() or {}
         if data.get('owner_id') == user_id:
             task_id = data.get('task_id')
             hours_worked = data.get('hours_worked', 0)

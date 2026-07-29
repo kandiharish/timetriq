@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
@@ -7,7 +7,10 @@ import { Tasks } from './pages/Tasks';
 import { Settings } from './pages/Settings';
 import { AuthProvider, useAuth } from './components/AuthContext';
 import { TimerProvider } from './context/TimerContext';
+import { NotificationProvider } from './context/NotificationContext';
 import './index.css';
+import { Toaster } from 'react-hot-toast';
+import { initializeServiceWorker, setupMessageListener, requestNotificationPermission } from './services/notificationService';
 
 import { TimeEntries } from './pages/TimeEntries';
 
@@ -34,6 +37,18 @@ const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
 
 const AppContent: React.FC = () => {
   const { user } = useAuth();
+
+  useEffect(() => {
+    initializeServiceWorker();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      user.getIdToken().then(token => {
+        requestNotificationPermission(token);
+      });
+    }
+  }, [user]);
 
   return (
     <Routes>
@@ -68,10 +83,13 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <BrowserRouter>
+      <Toaster position="top-right" />
       <AuthProvider>
-        <TimerProvider>
-          <AppContent />
-        </TimerProvider>
+        <NotificationProvider>
+          <TimerProvider>
+            <AppContent />
+          </TimerProvider>
+        </NotificationProvider>
       </AuthProvider>
     </BrowserRouter>
   );

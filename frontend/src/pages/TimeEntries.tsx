@@ -5,6 +5,8 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Calendar as CalendarIcon, Clock, TrendingUp, Target, Zap, Download, Plus, Edit2, Trash2, Play, Square } from 'lucide-react';
 import { useTimer } from '../context/TimerContext';
 import { Link } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export const TimeEntries: React.FC = () => {
   const { timers, stopTimer, getLiveElapsedSeconds } = useTimer();
@@ -18,6 +20,7 @@ export const TimeEntries: React.FC = () => {
   
   const [taskFilter, setTaskFilter] = useState<string>('All');
   const [tagFilter, setTagFilter] = useState<string>('All');
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -88,6 +91,61 @@ export const TimeEntries: React.FC = () => {
     if (tagFilter !== 'All' && tagLabel !== tagFilter) return false;
     return true;
   });
+
+  const handleExportCSV = () => {
+    if (filteredEntries.length === 0) return;
+    const headers = ['Task', 'Description', 'Date', 'Start Time', 'End Time', 'Duration', 'Tag', 'Notes'];
+    const rows = filteredEntries.map(entry => {
+      const task = tasks[entry.task_id];
+      const taskTitle = task?.title || 'Unknown Task';
+      const description = task?.description || '';
+      return [
+        taskTitle,
+        description,
+        new Date(entry.date).toLocaleDateString(),
+        '--:--',
+        '--:--',
+        `${entry.hours_worked}h`,
+        getTagColor(taskTitle).label,
+        entry.notes || ''
+      ].map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',');
+    });
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "time_entries.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setShowExportMenu(false);
+  };
+
+  const handleExportPDF = () => {
+    if (filteredEntries.length === 0) return;
+    const doc = new jsPDF();
+    doc.text("Time Entries Report", 14, 15);
+    const tableColumn = ["Task", "Date", "Duration", "Tag", "Notes"];
+    const tableRows: string[][] = [];
+    filteredEntries.forEach(entry => {
+      const task = tasks[entry.task_id];
+      const taskTitle = task?.title || 'Unknown Task';
+      tableRows.push([
+        taskTitle,
+        new Date(entry.date).toLocaleDateString(),
+        `${entry.hours_worked}h`,
+        getTagColor(taskTitle).label,
+        entry.notes || '-'
+      ]);
+    });
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 20
+    });
+    doc.save("time_entries.pdf");
+    setShowExportMenu(false);
+  };
 
   const filterSelectStyle = {
     padding: '6px 12px',
@@ -206,9 +264,24 @@ export const TimeEntries: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--color-border)' }}>
             <h3 style={{ fontSize: '0.875rem', fontWeight: 600, margin: 0, color: '#111827' }}>Time Entries</h3>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 500, color: '#374151', cursor: 'pointer' }}>
-                <Download size={14} /> Export
-              </button>
+              <div style={{ position: 'relative' }}>
+                <button 
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 500, color: '#374151', cursor: 'pointer' }}
+                >
+                  <Download size={14} /> Export
+                </button>
+                {showExportMenu && (
+                  <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', backgroundColor: '#fff', border: '1px solid var(--color-border)', borderRadius: '6px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', zIndex: 10 }}>
+                    <button onClick={handleExportCSV} style={{ display: 'block', width: '100%', padding: '8px 16px', textAlign: 'left', border: 'none', background: 'none', fontSize: '0.875rem', color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      Export as CSV
+                    </button>
+                    <button onClick={handleExportPDF} style={{ display: 'block', width: '100%', padding: '8px 16px', textAlign: 'left', border: 'none', background: 'none', fontSize: '0.875rem', color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      Export as PDF
+                    </button>
+                  </div>
+                )}
+              </div>
               <Link to="/tasks" style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#4F46E5', border: 'none', borderRadius: '6px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 500, color: '#FFFFFF', cursor: 'pointer', textDecoration: 'none' }}>
                 <Plus size={14} /> Add Time
               </Link>
@@ -395,14 +468,14 @@ export const TimeEntries: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ backgroundColor: '#ECFDF5', padding: '6px', borderRadius: '6px', color: '#059669' }}><CalendarIcon size={14} /></div>
-                <span style={{ fontSize: '0.875rem', color: '#374151', fontWeight: 500 }}>Billable Hours</span>
+                <span style={{ fontSize: '0.875rem', color: '#374151', fontWeight: 500 }}>Focused Work</span>
               </div>
               <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>{(totalHours * 0.6).toFixed(1)}h</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ backgroundColor: '#FFFBEB', padding: '6px', borderRadius: '6px', color: '#D97706' }}><Target size={14} /></div>
-                <span style={{ fontSize: '0.875rem', color: '#374151', fontWeight: 500 }}>Non-billable Hours</span>
+                <span style={{ fontSize: '0.875rem', color: '#374151', fontWeight: 500 }}>Meetings & Admin</span>
               </div>
               <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: 600 }}>{(totalHours * 0.4).toFixed(1)}h</span>
             </div>

@@ -49,7 +49,7 @@ export const Dashboard: React.FC = () => {
   const weeklyCap = Number(metrics.weekly_capacity) || 40;
   const remainingCapacity = parseFloat(Math.max(weeklyCap - loggedHoursTotal, 0).toFixed(2));
   
-  const avgProgress = totalTasks > 0 ? Math.round((tasks.filter(t => t.status === 'Completed').length / totalTasks) * 100) : 0;
+
 
   // Banner Styles
   const bannerStyle = { backgroundColor: '#FEF3C7', padding: '16px', borderRadius: '8px', border: '1px solid #FDE68A', marginBottom: '24px', color: '#92400E', fontSize: '0.875rem', fontWeight: 500 };
@@ -168,12 +168,6 @@ export const Dashboard: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
             <div style={{ backgroundColor: '#F3E8FF', padding: '10px', borderRadius: '12px' }}><Activity size={20} color="#9333EA" /></div>
             <div><div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Remaining Capacity</div><div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{remainingCapacity}h</div></div>
-          </div>
-        </div>
-        <div style={cardStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ backgroundColor: '#E0F2FE', padding: '10px', borderRadius: '12px' }}><Activity size={20} color="#0EA5E9" /></div>
-            <div><div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Avg. Progress</div><div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{avgProgress}%</div></div>
           </div>
         </div>
       </div>

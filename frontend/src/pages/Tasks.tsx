@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { taskService, type Task } from '../services/taskService';
 import { timeService } from '../services/timeService';
 import { TaskForm } from '../components/TaskForm';
-import { GripVertical, Search, CheckCircle2, Circle, Clock, Calendar as CalendarIcon, X, Plus, Trash2, Check, Play, Pause, XCircle, Target } from 'lucide-react';
+import { GripVertical, Search, CheckCircle2, Circle, Clock, Calendar as CalendarIcon, X, Plus, Trash2, Check, Play, Pause, XCircle, Target, ChevronDown } from 'lucide-react';
 import { useTimer } from '../context/TimerContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -384,6 +384,10 @@ export const Tasks: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
+  const [dateFilter, setDateFilter] = useState('All');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [showCustomDateModal, setShowCustomDateModal] = useState(false);
 
   const fetchTasks = async () => {
     try {
@@ -599,13 +603,81 @@ export const Tasks: React.FC = () => {
     const matchesSearch = t.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'All' || t.status === statusFilter;
     const matchesPriority = priorityFilter === 'All' || t.priority === priorityFilter;
-    return matchesSearch && matchesStatus && matchesPriority;
+    
+    let matchesDate = true;
+    if (dateFilter !== 'All') {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+      const eow = new Date(today);
+      const daysUntilSunday = eow.getDay() === 0 ? 0 : 7 - eow.getDay();
+      eow.setDate(eow.getDate() + daysUntilSunday);
+      const eowStr = eow.toISOString().split('T')[0];
+
+      if (dateFilter === 'Today') {
+        matchesDate = t.dueDate === todayStr;
+      } else if (dateFilter === 'Yesterday') {
+        matchesDate = t.dueDate === yesterdayStr;
+      } else if (dateFilter === 'This Week') {
+        matchesDate = t.dueDate >= todayStr && t.dueDate <= eowStr;
+      } else if (dateFilter === 'Custom Date' && (customStartDate || customEndDate)) {
+        if (customStartDate && customEndDate) {
+          matchesDate = t.dueDate >= customStartDate && t.dueDate <= customEndDate;
+        } else if (customStartDate) {
+          matchesDate = t.dueDate >= customStartDate;
+        } else if (customEndDate) {
+          matchesDate = t.dueDate <= customEndDate;
+        }
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesPriority && matchesDate;
   });
 
   const clearFilters = () => {
     setSearchTerm('');
     setStatusFilter('All');
     setPriorityFilter('All');
+    setDateFilter('All');
+    setCustomStartDate('');
+    setCustomEndDate('');
+  };
+
+  const selectWrapperStyle = { 
+    display: 'flex', 
+    alignItems: 'center', 
+    backgroundColor: '#F3F4F6', 
+    padding: '8px 16px', 
+    borderRadius: '24px', 
+    border: '1px solid transparent',
+    transition: 'all 0.2s',
+    cursor: 'pointer',
+    position: 'relative' as const
+  };
+
+  const selectStyle = { 
+    appearance: 'none' as const,
+    WebkitAppearance: 'none' as const,
+    border: 'none', 
+    outline: 'none', 
+    fontSize: '0.875rem', 
+    fontWeight: 500, 
+    backgroundColor: 'transparent', 
+    cursor: 'pointer',
+    color: '#374151',
+    paddingRight: '24px',
+    width: '100%'
+  };
+
+  const selectIconStyle = {
+    position: 'absolute' as const,
+    right: '12px',
+    pointerEvents: 'none' as const,
+    color: '#6B7280'
   };
 
   const statCardStyle = { flex: 1, minWidth: '140px', backgroundColor: '#FFFFFF', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', display: 'flex', gap: '8px', alignItems: 'center' };
@@ -698,29 +770,58 @@ export const Tasks: React.FC = () => {
             />
           </div>
           
-          <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#FFFFFF', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+          <div style={selectWrapperStyle} className="filter-dropdown">
             <span style={{ fontSize: '0.875rem', color: '#6B7280', marginRight: '8px' }}>Status:</span>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ border: 'none', outline: 'none', fontSize: '0.875rem', fontWeight: 500, backgroundColor: 'transparent', cursor: 'pointer' }}>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
               <option value="All">All</option>
               <option value="Todo">Todo</option>
               <option value="In Progress">In Progress</option>
               <option value="Review">Review</option>
               <option value="Completed">Completed</option>
             </select>
+            <ChevronDown size={14} style={selectIconStyle} />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#FFFFFF', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+          <div style={selectWrapperStyle} className="filter-dropdown">
             <span style={{ fontSize: '0.875rem', color: '#6B7280', marginRight: '8px' }}>Priority:</span>
-            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} style={{ border: 'none', outline: 'none', fontSize: '0.875rem', fontWeight: 500, backgroundColor: 'transparent', cursor: 'pointer' }}>
+            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} style={selectStyle}>
               <option value="All">All</option>
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
               <option value="High">High</option>
               <option value="Critical">Critical</option>
             </select>
+            <ChevronDown size={14} style={selectIconStyle} />
           </div>
 
-          {(searchTerm || statusFilter !== 'All' || priorityFilter !== 'All') && (
+          <div style={selectWrapperStyle} className="filter-dropdown">
+            <span style={{ fontSize: '0.875rem', color: '#6B7280', marginRight: '8px' }}>Timeframe:</span>
+            <select value={dateFilter} onChange={(e) => {
+              setDateFilter(e.target.value);
+              if (e.target.value === 'Custom Date') {
+                setShowCustomDateModal(true);
+              }
+            }} style={selectStyle}>
+              <option value="All">All Time</option>
+              <option value="Today">Today</option>
+              <option value="Yesterday">Yesterday</option>
+              <option value="This Week">This Week</option>
+              <option value="Custom Date">Custom Date</option>
+            </select>
+            <ChevronDown size={14} style={selectIconStyle} />
+          </div>
+          
+          {dateFilter === 'Custom Date' && (
+            <button 
+              onClick={() => setShowCustomDateModal(true)}
+              style={{ display: 'flex', alignItems: 'center', backgroundColor: '#F3F4F6', padding: '8px 16px', borderRadius: '24px', border: '1px solid #E5E7EB', fontSize: '0.875rem', fontWeight: 500, color: '#374151', cursor: 'pointer' }}
+            >
+              <CalendarIcon size={14} style={{ marginRight: '8px', color: '#6B7280' }} />
+              {customStartDate && customEndDate ? `${customStartDate} to ${customEndDate}` : (customStartDate || customEndDate || 'Select Range')}
+            </button>
+          )}
+
+          {(searchTerm || statusFilter !== 'All' || priorityFilter !== 'All' || dateFilter !== 'All') && (
             <button onClick={clearFilters} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', color: '#6B7280', fontSize: '0.875rem', cursor: 'pointer' }}>
               <X size={14} /> Clear filters
             </button>
@@ -1284,6 +1385,57 @@ export const Tasks: React.FC = () => {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* Custom Date Modal */}
+      {showCustomDateModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '24px', width: '400px', maxWidth: '90%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>Select Date Range</h2>
+              <button onClick={() => setShowCustomDateModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#6B7280" /></button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '8px' }}>Start Date</label>
+                <input 
+                  type="date" 
+                  value={customStartDate} 
+                  onChange={(e) => setCustomStartDate(e.target.value)} 
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #D1D5DB', fontSize: '0.875rem' }}
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '8px' }}>End Date</label>
+                <input 
+                  type="date" 
+                  value={customEndDate} 
+                  onChange={(e) => setCustomEndDate(e.target.value)} 
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #D1D5DB', fontSize: '0.875rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+                <button 
+                  onClick={() => {
+                    setCustomStartDate('');
+                    setCustomEndDate('');
+                  }}
+                  style={{ padding: '8px 16px', border: 'none', background: 'none', color: '#6B7280', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 500 }}
+                >
+                  Clear
+                </button>
+                <button 
+                  onClick={() => setShowCustomDateModal(false)}
+                  style={{ padding: '8px 16px', backgroundColor: '#2563EB', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 500 }}
+                >
+                  Apply Range
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -116,9 +116,7 @@ export const TimesheetGrid: React.FC = () => {
             <button onClick={() => setWeekOffset(prev => prev - 1)} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', color: '#6B7280', cursor: 'pointer' }}>&lt;</button>
             <button onClick={() => setWeekOffset(prev => prev + 1)} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', color: '#6B7280', cursor: 'pointer' }}>&gt;</button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#EEF2FF', padding: '6px 12px', borderRadius: '6px' }}>
-            <span style={{ fontSize: '0.75rem', color: '#4F46E5', fontWeight: 600 }}>≡ƒæñ Me</span>
-          </div>
+
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 # API Router Initialization
 from fastapi import APIRouter
-from app.api.endpoints import users, tasks, time_entries, dashboard, settings, calendar
+from app.api.endpoints import users, tasks, time_entries, dashboard, settings, calendar, notifications
 
 api_router = APIRouter()
 
@@ -11,6 +11,7 @@ api_router.include_router(time_entries.router, prefix="/time-entries", tags=["ti
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
 api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 
 
 
