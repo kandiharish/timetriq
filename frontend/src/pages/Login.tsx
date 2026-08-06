@@ -4,7 +4,22 @@ import { auth } from '../core/firebase';
 import { isAllowedDomain } from '../utils/auth';
 import { ChevronDown, Eye, EyeOff } from 'lucide-react';
 
+const features = [
+  { title: "Streamline your workflow", description: "Manage tasks, projects, and deadlines seamlessly in one place." },
+  { title: "Track time effortlessly", description: "Log your hours accurately and gain insights into your productivity." },
+  { title: "Manage your team", description: "Assign roles, monitor workloads, and collaborate with precision." }
+];
+
 export const Login: React.FC = () => {
+  const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentFeatureIndex((prev) => (prev + 1) % features.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const [isRegistering, setIsRegistering] = useState(false);
 
   const [email, setEmail] = useState('');
@@ -116,32 +131,95 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      height: '100vh', 
-      backgroundImage: 'url("/timetriq%20logo.png")',
-      backgroundSize: '400px',
-      backgroundRepeat: 'no-repeat',
-      backgroundPosition: 'center',
-      backgroundColor: '#f3f4f6' 
-    }}>
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }}>
       <div style={{ 
-        backgroundColor: 'rgba(255, 255, 255, 0.7)', 
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        padding: 'var(--spacing-8)', 
-        borderRadius: 'var(--radius-lg)', 
-        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)', 
-        border: '1px solid rgba(255, 255, 255, 0.4)',
+        display: 'flex', 
         width: '100%', 
-        maxWidth: '400px' 
+        maxWidth: '1200px', 
+        height: '85vh',
+        minHeight: '650px',
+        maxHeight: '900px',
+        backgroundColor: 'white', 
+        borderRadius: '24px', 
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 40px rgba(0,0,0,0.1)', 
+        overflow: 'hidden' 
       }}>
-        <h1 style={{ marginBottom: 'var(--spacing-2)', textAlign: 'center', color: 'var(--color-text-primary)' }}>Welcome to Timetriq</h1>
-        <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-6)', fontSize: '0.875rem' }}>
-          Sign in using your Verve Advisory account.
-        </p>
+      {/* Left Side - Branding */}
+      <div style={{ 
+        flex: 1, 
+        backgroundColor: '#1E1B4B', 
+        backgroundImage: 'linear-gradient(rgba(30, 27, 75, 0.7), rgba(67, 56, 202, 0.7)), url("/image.png")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '40px',
+        color: 'white',
+        position: 'relative'
+      }}>
+        <div style={{ zIndex: 1, textAlign: 'center', maxWidth: '80%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+           <h1 style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '4.5rem', fontWeight: 700, marginBottom: '3rem', letterSpacing: '-0.025em', textShadow: '0 4px 15px rgba(0,0,0,0.5)' }}>Timetriq</h1>
+           
+           <div style={{ position: 'relative', height: '140px', width: '100%', maxWidth: '450px', fontFamily: 'Inter, system-ui, sans-serif' }}>
+             {features.map((feature, index) => (
+               <div 
+                 key={index}
+                 style={{
+                   position: 'absolute',
+                   top: 0,
+                   left: 0,
+                   width: '100%',
+                   opacity: currentFeatureIndex === index ? 1 : 0,
+                   transform: currentFeatureIndex === index ? 'translateY(0)' : 'translateY(20px)',
+                   transition: 'all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                   pointerEvents: currentFeatureIndex === index ? 'auto' : 'none'
+                 }}
+               >
+                 <h3 style={{ 
+                   fontSize: '2rem', 
+                   fontWeight: 700, 
+                   marginBottom: '1rem',
+                   textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                   letterSpacing: '-0.01em'
+                 }}>
+                   {feature.title}
+                 </h3>
+                 <p style={{ 
+                   fontSize: '1.25rem', 
+                   opacity: currentFeatureIndex === index ? 0.9 : 0,
+                   transform: currentFeatureIndex === index ? 'translateY(0)' : 'translateY(10px)',
+                   transition: 'all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.15s',
+                   lineHeight: 1.6,
+                   textShadow: '0 1px 5px rgba(0,0,0,0.3)',
+                   fontWeight: 300
+                 }}>
+                   {feature.description}
+                 </p>
+               </div>
+             ))}
+           </div>
+           
+
+        </div>
+      </div>
+
+      {/* Right Side - Form */}
+      <div style={{ 
+        flex: 1, 
+        backgroundColor: '#ffffff',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '40px',
+        overflowY: 'auto'
+      }}>
+        <div style={{ width: '100%', maxWidth: '400px' }}>
+          <h2 style={{ marginBottom: '0.5rem', textAlign: 'center', color: '#111827', fontSize: '2rem', fontWeight: 700 }}>Welcome Back</h2>
+          <p style={{ textAlign: 'center', color: '#6B7280', marginBottom: '2.5rem', fontSize: '0.875rem' }}>
+            Sign in using your Verve Advisory account.
+          </p>
         
         {error && <div style={{ backgroundColor: '#fee2e2', color: 'var(--color-error)', padding: 'var(--spacing-3)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-4)', fontSize: '0.875rem' }}>{error}</div>}
         {resetMessage && <div style={{ backgroundColor: '#dcfce7', color: '#166534', padding: 'var(--spacing-3)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-4)', fontSize: '0.875rem' }}>{resetMessage}</div>}
@@ -293,6 +371,8 @@ export const Login: React.FC = () => {
         <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '0.75rem', color: '#9CA3AF' }}>
           Only @verveadvisory.com email accounts are permitted.
         </div>
+        </div>
+      </div>
       </div>
     </div>
   );
