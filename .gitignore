@@ -38,3 +38,6 @@ out/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Markdown notes
+*.md

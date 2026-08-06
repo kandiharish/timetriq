@@ -71,3 +71,11 @@ def delete_task(task_id: str, current_user: dict = Depends(get_current_user)):
     success = task_service.delete_task(user_id, task_id)
     if not success:
         raise HTTPException(status_code=404, detail="Task not found")
+
+@router.post("/{task_id}/star", response_model=TaskResponse)
+def toggle_task_star(task_id: str, current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user.get("uid", ""))
+    task = task_service.toggle_task_star(user_id, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task

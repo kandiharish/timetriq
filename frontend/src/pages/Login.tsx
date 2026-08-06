@@ -1,18 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../core/firebase';
 import { isAllowedDomain } from '../utils/auth';
+import { ChevronDown } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [isRegistering, setIsRegistering] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowRoleDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!role) {
+      setError('Please select a role before continuing.');
+      return;
+    }
+    
     try {
       setError(null);
       setLoading(true);
@@ -22,8 +41,11 @@ export const Login: React.FC = () => {
           setLoading(false);
           return;
         }
+        // Role is passed via localStorage so AuthContext can pick it up during initial profile creation
+        localStorage.setItem('pendingUserRole', role);
         await createUserWithEmailAndPassword(auth, email, password);
       } else {
+        localStorage.setItem('pendingUserRole', role);
         const credential = await signInWithEmailAndPassword(auth, email, password);
         if (!isAllowedDomain(credential.user.email)) {
           await auth.signOut();
@@ -40,7 +62,8 @@ export const Login: React.FC = () => {
       } else if (err.code === 'auth/weak-password') {
         setError('Password should be at least 6 characters.');
       } else {
-        setError(isRegistering ? 'Failed to create an account.' : 'Failed to log in.');
+        console.error("Login error:", err);
+        setError(isRegistering ? `Failed to create an account: ${err.message}` : `Failed to log in: ${err.message}`);
       }
     } finally {
       setLoading(false);
@@ -48,9 +71,14 @@ export const Login: React.FC = () => {
   };
 
   const handleGoogleLogin = async () => {
+    if (!role) {
+      setError('Please select a role before continuing with Google.');
+      return;
+    }
     try {
       setError(null);
       setLoading(true);
+      localStorage.setItem('pendingUserRole', role);
       const provider = new GoogleAuthProvider();
       const credential = await signInWithPopup(auth, provider);
       
@@ -98,6 +126,32 @@ export const Login: React.FC = () => {
         {error && <div style={{ backgroundColor: '#fee2e2', color: 'var(--color-error)', padding: 'var(--spacing-3)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-4)', fontSize: '0.875rem' }}>{error}</div>}
         
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
+          <div ref={dropdownRef} style={{ position: 'relative' }}>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: 'var(--spacing-1)' }}>Select Role</label>
+            <div 
+              onClick={() => setShowRoleDropdown(!showRoleDropdown)}
+              style={{ width: '100%', padding: 'var(--spacing-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+            >
+              <span style={{ color: role ? '#111827' : '#9CA3AF' }}>{role || 'Select your role...'}</span>
+              <ChevronDown size={16} style={{ color: '#6B7280' }} />
+            </div>
+            
+            {showRoleDropdown && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', backgroundColor: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', zIndex: 10 }}>
+                {['Admin', 'Manager', 'Employee'].map(r => (
+                  <div
+                    key={r}
+                    onClick={() => { setRole(r); setShowRoleDropdown(false); }}
+                    style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.875rem', backgroundColor: role === r ? '#F3F4F6' : 'transparent', color: '#374151' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = role === r ? '#F3F4F6' : 'transparent'}
+                  >
+                    {r}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <div>
             <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: 'var(--spacing-1)' }}>Email Address</label>
             <input 

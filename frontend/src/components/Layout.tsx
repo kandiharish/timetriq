@@ -6,12 +6,14 @@ import { useNotifications } from '../context/NotificationContext';
 import { 
   LayoutDashboard, CheckSquare, Calendar, Clock, 
   BarChart2, Settings as SettingsIcon,
-  Search, Bell, ChevronDown,
-  PieChart, Activity, TrendingUp, Briefcase, Plus, X
+  Bell, ChevronDown, MessageSquare,
+  Activity, Briefcase, Plus, X, Users
 } from 'lucide-react';
+import { WorkspaceSidebar } from './workspace/WorkspaceSidebar';
+import { StatusSelector } from './StatusSelector';
 
 export const Layout: React.FC = () => {
-  const { logout } = useAuth();
+  const { logout, hasRole } = useAuth();
   const location = useLocation();
   const { timers, stopTimer, getLiveElapsedSeconds, focusSession, stopFocus } = useTimer();
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useNotifications();
@@ -24,6 +26,13 @@ export const Layout: React.FC = () => {
   
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
+
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -49,20 +58,21 @@ export const Layout: React.FC = () => {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const mainNavItems = [
+  const baseNavItems = [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={18} /> },
     { name: 'My Tasks', path: '/tasks', icon: <CheckSquare size={18} /> },
+    { name: 'Chat', path: '/chat', icon: <MessageSquare size={18} /> },
     { name: 'Time Tracking', path: '/time-entries', icon: <Clock size={18} /> },
     { name: 'Calendar', path: '/calendar', icon: <Calendar size={18} /> },
+    { name: hasRole(['Admin']) ? 'Teams' : 'My Team', path: '/teams', icon: <Users size={18} /> },
     { name: 'Reports', path: '/reports', icon: <BarChart2 size={18} /> },
     { name: 'Workload', path: '/workload', icon: <Activity size={18} /> },
   ];
 
-  const analyticsItems = [
-    { name: 'Performance', path: '/performance', icon: <Activity size={18} /> },
-    { name: 'Estimates', path: '/estimates', icon: <PieChart size={18} /> },
-    { name: 'Trends', path: '/trends', icon: <TrendingUp size={18} /> },
+  const adminManagerNavItems: any[] = [
   ];
+
+  const mainNavItems = hasRole(['Admin', 'Manager']) ? [...baseNavItems, ...adminManagerNavItems] : baseNavItems;
 
   const settingsItems = [
     { name: 'Settings', path: '/settings', icon: <SettingsIcon size={18} /> },
@@ -129,12 +139,7 @@ export const Layout: React.FC = () => {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--spacing-6)' }}>
           {renderNavGroup(mainNavItems)}
 
-          <div>
-            <div style={{ fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-sidebar-text)', letterSpacing: '0.05em', marginBottom: '8px', paddingLeft: '12px' }}>
-              Analytics
-            </div>
-            {renderNavGroup(analyticsItems)}
-          </div>
+          <WorkspaceSidebar />
 
           <div>
             <div style={{ fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-sidebar-text)', letterSpacing: '0.05em', marginBottom: '8px', paddingLeft: '12px' }}>
@@ -184,31 +189,25 @@ export const Layout: React.FC = () => {
           padding: '0 var(--spacing-6)',
           zIndex: 5
         }}>
-          {/* Left: Search */}
+          {/* Left: Clock / Date */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-6)' }}>
-            
             <div style={{ 
               display: 'flex', 
-              alignItems: 'center', 
-              backgroundColor: 'var(--color-background)', 
-              padding: '6px 12px', 
-              borderRadius: 'var(--radius-md)',
-              width: '320px',
-              border: '1px solid var(--color-border)'
+              flexDirection: 'column',
+              justifyContent: 'center'
             }}>
-              <Search size={16} color="var(--color-text-secondary)" style={{ marginRight: '8px' }} />
-              <input 
-                type="text" 
-                placeholder="Search tasks, projects, users..." 
-                style={{ 
-                  border: 'none', 
-                  background: 'transparent', 
-                  outline: 'none', 
-                  width: '100%',
-                  fontSize: '0.875rem',
-                  color: 'var(--color-text-primary)'
-                }} 
-              />
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Today's Focus
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                  {currentTime.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                </span>
+                <span style={{ color: 'var(--color-border)' }}>|</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-primary)' }}>
+                  {currentTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true })}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -402,6 +401,23 @@ export const Layout: React.FC = () => {
               <Plus size={14} /> New Task
             </Link>
 
+            <Link to="/teams?tab=leave" style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: '#F3F4F6',
+              color: '#374151',
+              border: '1px solid var(--color-border)',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              fontSize: '0.8125rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+              textDecoration: 'none'
+            }}>
+              <Plus size={14} /> Request Leave
+            </Link>
+
             <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--color-border)', margin: '0 8px' }}></div>
 
             <div style={{ position: 'relative' }} ref={notificationsRef}>
@@ -471,6 +487,8 @@ export const Layout: React.FC = () => {
               )}
             </div>
             
+            <StatusSelector />
+
             {/* User Account Dropdown */}
             <div style={{ position: 'relative' }} ref={profileMenuRef}>
               <button

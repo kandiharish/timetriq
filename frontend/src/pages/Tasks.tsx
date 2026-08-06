@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { taskService, type Task } from '../services/taskService';
-import { timeService } from '../services/timeService';
+import React, { useEffect, useState, useRef } from 'react';
+import { taskService, type Task, SAMPLE_TEAM_MEMBERS } from '../services/taskService';
+import { timeService, type TimeEntry } from '../services/timeService';
 import { TaskForm } from '../components/TaskForm';
-import { GripVertical, Search, CheckCircle2, Circle, Clock, Calendar as CalendarIcon, X, Plus, Trash2, Check, Play, Pause, XCircle, Target, ChevronDown } from 'lucide-react';
+import { Tag as TagIcon, GripVertical, Search, CheckCircle2, Circle, Clock, Calendar as CalendarIcon, X, Plus, Trash2, Check, Play, Pause, XCircle, Target } from 'lucide-react';
 import { useTimer } from '../context/TimerContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -10,6 +10,7 @@ import type { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+import { CustomSelect } from '../components/CustomSelect';
 import { formatHoursCompact, parseEstimatedTime, formatHours } from '../lib/utils';
 
 interface SortableRowProps {
@@ -23,9 +24,10 @@ interface SortableRowProps {
   onTimeLogged: () => void;
   isOverdue: boolean;
   onStartFocus: (task: Task) => void;
+  onToggleStar: (id: string) => void;
 }
 
-const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSelect, onLogTime, onDelete, onViewDetails, onStatusChange, onTimeLogged, isOverdue, onStartFocus }) => {
+const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSelect, onLogTime, onDelete, onViewDetails, onStatusChange, onTimeLogged, isOverdue, onStartFocus, onToggleStar }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id });
   
   const { timers, startTimer, pauseTimer, stopTimer, cancelTimer, getLiveElapsedSeconds } = useTimer();
@@ -56,7 +58,6 @@ const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSel
   };
 
   const actualHours = task.actualHours || 0;
-  const remaining = Math.max(task.estimatedHours - actualHours, 0);
   const progress = task.estimatedHours > 0 ? Math.min(Math.round((actualHours / task.estimatedHours) * 100), 100) : 0;
 
   const getStatusColor = (status: string) => {
@@ -85,11 +86,11 @@ const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSel
   const progColor = task.status === 'Completed' ? '#059669' : (task.status === 'In Progress' ? '#2563EB' : '#D1D5DB');
 
   return (
-    <tr ref={setNodeRef} style={style}>
-      <td style={{ padding: '8px 0', width: '25%' }}>
+    <tr ref={setNodeRef} style={style} {...attributes}>
+      <td style={{ padding: '8px 0', borderLeft: isSelected ? '2px solid #4F46E5' : '2px solid transparent' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-          <div {...attributes} {...listeners} style={{ cursor: 'grab', marginTop: '2px' }} onClick={e => e.stopPropagation()}>
-            <GripVertical size={14} color="#D1D5DB" />
+          <div {...listeners} style={{ marginTop: '2px', cursor: 'grab', color: '#9CA3AF', padding: '2px', touchAction: 'none' }} className="drag-handle">
+            <GripVertical size={14} />
           </div>
           <input 
             type="checkbox" 
@@ -99,9 +100,16 @@ const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSel
             style={{ marginTop: '2px', cursor: 'pointer' }}
           />
           <div onClick={() => onViewDetails(task)} style={{ cursor: 'pointer' }}>
-            <div style={{ fontWeight: 600, color: '#111827', fontSize: '0.8125rem', marginBottom: '2px' }}>{task.title}</div>
+            <div style={{ fontWeight: 600, color: '#111827', fontSize: '0.8125rem', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {task.title}
+            </div>
             {task.description && <div style={{ fontSize: '0.7rem', color: '#6B7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '250px' }}>{task.description}</div>}
           </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleStar(task.id); }}
+            title={task.isStarred ? 'Remove from starred' : 'Add to starred'}
+            style={{ background: 'none', border: 'none', padding: '2px 3px', cursor: 'pointer', lineHeight: 1, flexShrink: 0, color: task.isStarred ? '#F59E0B' : '#C4C9D4', fontSize: '14px', transition: 'color 0.15s', marginTop: '1px' }}
+          >{task.isStarred ? '★' : '☆'}</button>
         </div>
       </td>
       <td style={{ padding: '8px 0' }}>
@@ -110,39 +118,61 @@ const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSel
         </span>
       </td>
       <td style={{ padding: '8px 0' }}>
-        <select
-          value={task.status}
-          onChange={(e) => onStatusChange(task.id, e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            backgroundColor: statusColors.bg,
-            color: statusColors.text,
-            padding: '3px 16px 3px 8px',
-            borderRadius: '6px',
-            fontSize: '0.7rem',
-            fontWeight: 600,
-            border: '1px solid transparent',
-            cursor: 'pointer',
-            outline: 'none',
-            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='${encodeURIComponent(statusColors.text)}' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>")`,
-            backgroundRepeat: 'no-repeat',
-            backgroundPosition: 'right 6px center',
-            appearance: 'none',
-            WebkitAppearance: 'none',
-            minWidth: '95px',
-            textAlign: 'left'
-          }}
-        >
-          <option value="Todo" style={{ backgroundColor: 'white', color: '#374151' }}>Todo</option>
-          <option value="In Progress" style={{ backgroundColor: 'white', color: '#2563EB' }}>In Progress</option>
-          <option value="Review" style={{ backgroundColor: 'white', color: '#D97706' }}>Review</option>
-          <option value="Completed" style={{ backgroundColor: 'white', color: '#059669' }}>Completed</option>
-          <option value="Blocked" style={{ backgroundColor: 'white', color: '#DC2626' }}>Blocked</option>
-        </select>
+        <div onClick={(e) => e.stopPropagation()}>
+          <CustomSelect
+            value={task.status}
+            onChange={(val: string) => onStatusChange(task.id, val)}
+            options={[
+              { value: 'Todo', label: 'Todo', color: '#6B7280' },
+              { value: 'In Progress', label: 'In Progress', color: '#2563EB' },
+              { value: 'Review', label: 'Review', color: '#D97706' },
+              { value: 'Completed', label: 'Completed', color: '#059669' },
+              { value: 'Blocked', label: 'Blocked', color: '#DC2626' }
+            ]}
+            buttonStyle={{
+              backgroundColor: statusColors.bg,
+              color: statusColors.text,
+              padding: '3px 8px',
+              borderRadius: '6px',
+              fontSize: '0.7rem',
+              fontWeight: 600,
+              border: '1px solid transparent',
+              width: 'auto',
+              minWidth: 'unset',
+              whiteSpace: 'nowrap'
+            }}
+          />
+        </div>
       </td>
-      <td style={{ padding: '8px 0', color: '#4B5563', fontSize: '0.8125rem' }}>{formatHoursCompact(task.estimatedHours)}</td>
-      <td style={{ padding: '8px 0', color: '#4B5563', fontSize: '0.8125rem' }}>{formatHoursCompact(actualHours)}</td>
-      <td style={{ padding: '8px 0', color: '#4B5563', fontSize: '0.8125rem' }}>{formatHoursCompact(remaining)}</td>
+      <td style={{ padding: '8px 0' }}>
+        {/* Stacked overlapping assignee circles */}
+        {(() => {
+          const MAX_SHOW = 3;
+          const assigneeIds: string[] = (task.assignees && task.assignees.length > 0)
+            ? task.assignees
+            : task.assignedUserId ? [task.assignedUserId] : [];
+          if (assigneeIds.length === 0) {
+            return (
+              <div title="Unassigned" style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: '#F3F4F6', color: '#9CA3AF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, border: '2px solid #E5E7EB' }}>?</div>
+            );
+          }
+          const visible = assigneeIds.slice(0, MAX_SHOW);
+          const extra = assigneeIds.length - MAX_SHOW;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {visible.map((aid, i) => {
+                const m = SAMPLE_TEAM_MEMBERS.find(m => m.id === aid) || { initials: aid.substring(0,2).toUpperCase(), color: '#6B7280', name: aid };
+                return (
+                  <div key={aid} title={m.name} style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: m.color, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, border: '2px solid white', marginLeft: i === 0 ? '0' : '-8px', zIndex: MAX_SHOW - i, position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.15)', flexShrink: 0 }}>{m.initials}</div>
+                );
+              })}
+              {extra > 0 && (
+                <div title={`+${extra} more`} style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: '#E5E7EB', color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 800, border: '2px solid white', marginLeft: '-8px', zIndex: 0, position: 'relative', flexShrink: 0 }}>+{extra}</div>
+              )}
+            </div>
+          );
+        })()}
+      </td>
       <td style={{ padding: '8px 0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ flex: 1, height: '4px', backgroundColor: '#F3F4F6', borderRadius: '2px', minWidth: '40px' }}>
@@ -264,15 +294,496 @@ const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSel
   );
 };
 
+const StaticRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSelect, onLogTime, onDelete, onViewDetails, onStatusChange, onTimeLogged, isOverdue, onStartFocus, onToggleStar }) => {
+  const { timers, startTimer, pauseTimer, stopTimer, cancelTimer, getLiveElapsedSeconds } = useTimer();
+  const taskTimer = timers[task.id];
+  const isRunning = taskTimer && taskTimer.startTime !== null;
+  const isPaused = taskTimer && taskTimer.startTime === null;
+  const elapsed = getLiveElapsedSeconds(task.id);
+
+  const formatTimerDisplay = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    
+    if (h > 0) return `${h}h ${m}m ${s}s`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  };
+  
+  const style = {
+    backgroundColor: isSelected ? '#F3F4F6' : 'white',
+    borderBottom: '1px solid #F3F4F6'
+  };
+
+  const actualHours = task.actualHours || 0;
+  const progress = task.estimatedHours > 0 ? Math.min(Math.round((actualHours / task.estimatedHours) * 100), 100) : 0;
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Todo': return { bg: '#F3F4F6', text: '#374151' };
+      case 'In Progress': return { bg: '#DBEAFE', text: '#2563EB' };
+      case 'Review': return { bg: '#FEF3C7', text: '#D97706' };
+      case 'Completed': return { bg: '#D1FAE5', text: '#059669' };
+      case 'Blocked': return { bg: '#FEE2E2', text: '#DC2626' };
+      default: return { bg: '#F3F4F6', text: '#374151' };
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'Low': return { bg: '#D1FAE5', text: '#059669' };
+      case 'Medium': return { bg: '#FEF3C7', text: '#D97706' };
+      case 'High': return { bg: '#FEE2E2', text: '#DC2626' };
+      case 'Critical': return { bg: '#FECACA', text: '#991B1B' };
+      default: return { bg: '#F3F4F6', text: '#374151' };
+    }
+  };
+
+  const statusColors = getStatusColor(task.status);
+  const prioColors = getPriorityColor(task.priority);
+  const progColor = task.status === 'Completed' ? '#059669' : (task.status === 'In Progress' ? '#2563EB' : '#D1D5DB');
+
+  return (
+    <tr style={style}>
+      <td style={{ padding: '8px 0', width: '25%' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+          <div style={{ width: '14px', marginTop: '2px' }}></div>
+          <input 
+            type="checkbox" 
+            checked={isSelected}
+            onChange={() => onToggleSelect(task.id)}
+            onClick={e => e.stopPropagation()}
+            style={{ marginTop: '2px', cursor: 'pointer' }}
+          />
+          <div onClick={() => onViewDetails(task)} style={{ cursor: 'pointer' }}>
+            <div style={{ fontWeight: 600, color: '#111827', fontSize: '0.8125rem', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {task.title}
+            </div>
+            {task.description && <div style={{ fontSize: '0.7rem', color: '#6B7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '250px' }}>{task.description}</div>}
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleStar(task.id); }}
+            title={task.isStarred ? 'Remove from starred' : 'Add to starred'}
+            style={{ background: 'none', border: 'none', padding: '2px 3px', cursor: 'pointer', lineHeight: 1, flexShrink: 0, color: task.isStarred ? '#F59E0B' : '#C4C9D4', fontSize: '14px', transition: 'color 0.15s', marginTop: '1px' }}
+          >{task.isStarred ? '★' : '☆'}</button>
+        </div>
+      </td>
+      <td style={{ padding: '8px 0' }}>
+        <span style={{ backgroundColor: prioColors.bg, color: prioColors.text, padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600 }}>
+          {task.priority}
+        </span>
+      </td>
+      <td style={{ padding: '8px 0' }}>
+        <div onClick={(e) => e.stopPropagation()}>
+          <CustomSelect
+            value={task.status}
+            onChange={(val: string) => onStatusChange(task.id, val)}
+            options={[
+              { value: 'Todo', label: 'Todo', color: '#6B7280' },
+              { value: 'In Progress', label: 'In Progress', color: '#2563EB' },
+              { value: 'Review', label: 'Review', color: '#D97706' },
+              { value: 'Completed', label: 'Completed', color: '#059669' },
+              { value: 'Blocked', label: 'Blocked', color: '#DC2626' }
+            ]}
+            buttonStyle={{
+              backgroundColor: statusColors.bg,
+              color: statusColors.text,
+              padding: '3px 8px',
+              borderRadius: '6px',
+              fontSize: '0.7rem',
+              fontWeight: 600,
+              border: '1px solid transparent',
+              minWidth: '105px'
+            }}
+          />
+        </div>
+      </td>
+      <td style={{ padding: '8px 0' }}>
+        {/* Stacked overlapping assignee circles */}
+        {(() => {
+          const MAX_SHOW = 3;
+          const assigneeIds: string[] = (task.assignees && task.assignees.length > 0)
+            ? task.assignees
+            : task.assignedUserId ? [task.assignedUserId] : [];
+          if (assigneeIds.length === 0) {
+            return (
+              <div title="Unassigned" style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: '#F3F4F6', color: '#9CA3AF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, border: '2px solid #E5E7EB' }}>?</div>
+            );
+          }
+          const visible = assigneeIds.slice(0, MAX_SHOW);
+          const extra = assigneeIds.length - MAX_SHOW;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {visible.map((aid, i) => {
+                const m = SAMPLE_TEAM_MEMBERS.find(m => m.id === aid) || { initials: aid.substring(0,2).toUpperCase(), color: '#6B7280', name: aid };
+                return (
+                  <div key={aid} title={m.name} style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: m.color, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, border: '2px solid white', marginLeft: i === 0 ? '0' : '-8px', zIndex: MAX_SHOW - i, position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.15)', flexShrink: 0 }}>{m.initials}</div>
+                );
+              })}
+              {extra > 0 && (
+                <div title={`+${extra} more`} style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: '#E5E7EB', color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 800, border: '2px solid white', marginLeft: '-8px', zIndex: 0, position: 'relative', flexShrink: 0 }}>+{extra}</div>
+              )}
+            </div>
+          );
+        })()}
+      </td>
+      <td style={{ padding: '8px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ flex: 1, height: '4px', backgroundColor: '#F3F4F6', borderRadius: '2px', minWidth: '40px' }}>
+            <div style={{ width: `${progress}%`, height: '100%', backgroundColor: progColor, borderRadius: '2px' }}></div>
+          </div>
+          <span style={{ fontSize: '0.7rem', color: '#6B7280', minWidth: '24px' }}>{progress}%</span>
+        </div>
+      </td>
+      <td style={{ padding: '8px 0', color: isOverdue ? '#DC2626' : '#4B5563', fontSize: '0.8125rem' }}>
+        {task.dueDate}
+      </td>
+      <td style={{ padding: '8px 0', color: '#6B7280', fontSize: '0.8125rem' }}>
+        {task.startDate || '—'}
+      </td>
+      <td style={{ padding: '8px 0' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-start' }}>
+          {/* Active / Paused Ticker */}
+          {(isRunning || isPaused) && (
+            <span style={{ 
+              fontSize: '0.65rem', 
+              fontFamily: 'monospace', 
+              fontWeight: 700, 
+              color: isRunning ? '#DC2626' : '#4B5563',
+              backgroundColor: isRunning ? '#FEF2F2' : '#F3F4F6',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              border: isRunning ? '1px solid #FECACA' : '1px solid #E5E7EB',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              {isRunning && <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#DC2626', animation: 'pulse 1.5s infinite' }}></span>}
+              {formatTimerDisplay(elapsed)}
+            </span>
+          )}
+
+          {/* Timer controls */}
+          {!taskTimer && (
+            <button 
+              onClick={() => startTimer(task.id, task.title)} 
+              title="Start Timer" 
+              className="btn-paper-icon"
+            >
+              <Play size={12} color="#4F46E5" />
+            </button>
+          )}
+
+          {isRunning && (
+            <button 
+              onClick={() => pauseTimer(task.id)} 
+              title="Pause Timer" 
+              className="btn-paper-icon"
+            >
+              <Pause size={12} color="#D97706" />
+            </button>
+          )}
+
+          {isPaused && (
+            <button 
+              onClick={() => startTimer(task.id, task.title)} 
+              title="Resume Timer" 
+              className="btn-paper-icon"
+            >
+              <Play size={12} color="#10B981" />
+            </button>
+          )}
+
+          {(isRunning || isPaused) && (
+            <>
+              <button 
+                onClick={async () => {
+                  await stopTimer(task.id);
+                  onTimeLogged();
+                }} 
+                title="Save & Log Time" 
+                className="btn-paper-icon"
+              >
+                <CheckCircle2 size={12} color="#10B981" />
+              </button>
+              <button 
+                onClick={() => cancelTimer(task.id)} 
+                title="Cancel Timer" 
+                className="btn-paper-icon"
+              >
+                <XCircle size={12} color="#EF4444" />
+              </button>
+            </>
+          )}
+
+          {/* Log Manual Time */}
+          <button 
+            onClick={() => onLogTime(task.id)} 
+            title="Log Time Manually" 
+            className="btn-paper-icon"
+          >
+            <Plus size={12} color="#4B5563" />
+          </button>
+
+          {/* Target Focus */}
+          <button 
+            onClick={() => onStartFocus(task)} 
+            title="Start Focus Sprint" 
+            className="btn-paper-icon"
+          >
+            <Target size={12} color="#DC2626" />
+          </button>
+
+          {/* Delete Task */}
+          <button 
+            onClick={() => onDelete(task.id)} 
+            title="Delete Task" 
+            className="btn-paper-icon"
+          >
+            <Trash2 size={12} color="#EF4444" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+};
+
+const Pagination = ({ currentPage, totalItems, pageSize, onPageChange }: any) => {
+  const totalPages = Math.ceil(totalItems / pageSize);
+  if (totalPages <= 1) return null;
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', padding: '12px 24px', borderTop: '1px solid var(--color-border)', backgroundColor: '#F9FAFB' }}>
+      <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #E5E7EB', backgroundColor: currentPage === 1 ? '#F3F4F6' : '#FFFFFF', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}>Previous</button>
+      <span style={{ fontSize: '0.875rem', color: '#6B7280' }}>Page {currentPage} of {totalPages}</span>
+      <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #E5E7EB', backgroundColor: currentPage === totalPages ? '#F3F4F6' : '#FFFFFF', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}>Next</button>
+    </div>
+  );
+};
+
+// ─── Premium Filter Dropdown ──────────────────────────────────────────────────
+const DateFilterSelect = ({ value, onChange, options, label, accentColor = '#4F46E5', accentBg = '#EEF2FF' }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  label?: string;
+  accentColor?: string;
+  accentBg?: string;
+}) => {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  const selected = options.find(o => o.value === value);
+  const isActive = value !== options[0]?.value;
+
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '5px',
+          padding: '6px 11px', borderRadius: '6px',
+          border: `1px solid ${isActive ? accentColor + '55' : '#E5E7EB'}`,
+          backgroundColor: isActive ? accentBg : '#FFFFFF',
+          color: isActive ? accentColor : '#374151',
+          fontSize: '0.8125rem', fontWeight: isActive ? 600 : 500,
+          cursor: 'pointer', whiteSpace: 'nowrap',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+          transition: 'all 0.15s'
+        }}
+      >
+        {label && <span style={{ color: '#9CA3AF', fontWeight: 400, marginRight: '1px' }}>{label}</span>}
+        {selected?.label}
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ marginLeft: '2px', flexShrink: 0, opacity: 0.5, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 5px)', left: 0, zIndex: 9999,
+          backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB',
+          borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+          minWidth: '140px', padding: '4px', overflow: 'hidden'
+        }}>
+          {options.map(opt => {
+            const isSel = opt.value === value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  width: '100%', padding: '7px 10px', borderRadius: '5px', border: 'none',
+                  backgroundColor: isSel ? accentBg : 'transparent',
+                  color: isSel ? accentColor : '#374151',
+                  fontSize: '0.8125rem', fontWeight: isSel ? 600 : 400,
+                  cursor: 'pointer', textAlign: 'left', whiteSpace: 'nowrap',
+                  transition: 'background-color 0.1s'
+                }}
+                onMouseEnter={e => { if (!isSel) (e.currentTarget as HTMLElement).style.backgroundColor = '#F9FAFB'; }}
+                onMouseLeave={e => { if (!isSel) (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+              >
+                {opt.label}
+                {isSel && (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ marginLeft: '8px', flexShrink: 0 }}>
+                    <path d="M2 6L5 9L10 3" stroke={accentColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── Premium Multi-Assignee Select for Quick Add ──────────────────────────────
+const QuickAddAssigneeSelect = ({ selectedIds, onChange, options }: {
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  options: { id: string; name: string; initials: string; color: string }[];
+}) => {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggleSelection = (id: string) => {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter(v => v !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  };
+
+  const selectedMembers = selectedIds.map(id => options.find(o => o.id === id)).filter(Boolean);
+
+  return (
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: '4px 10px', borderRadius: '6px',
+          border: '1px dashed #D1D5DB', backgroundColor: '#F9FAFB',
+          cursor: 'pointer', minHeight: '30px', minWidth: '120px'
+        }}
+      >
+        {selectedIds.length === 0 ? (
+          <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>Assignees...</span>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            {selectedMembers.slice(0, 3).map((m, i) => (
+              <div key={m?.id} style={{
+                width: '22px', height: '22px', borderRadius: '50%',
+                backgroundColor: m?.color || '#9CA3AF', color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.65rem', fontWeight: 600, border: '2px solid white',
+                marginLeft: i > 0 ? '-8px' : 0, zIndex: 10 - i
+              }}>
+                {m?.initials}
+              </div>
+            ))}
+            {selectedIds.length > 3 && (
+              <div style={{
+                width: '22px', height: '22px', borderRadius: '50%',
+                backgroundColor: '#F3F4F6', color: '#4B5563',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.65rem', fontWeight: 600, border: '2px solid white',
+                marginLeft: '-8px', zIndex: 0
+              }}>
+                +{selectedIds.length - 3}
+              </div>
+            )}
+          </div>
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 5px)', left: 0, zIndex: 9999,
+          backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB',
+          borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+          minWidth: '200px', padding: '6px', maxHeight: '250px', overflowY: 'auto'
+        }}>
+          {options.map(opt => {
+            const isSelected = selectedIds.includes(opt.id);
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => toggleSelection(opt.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  width: '100%', padding: '6px 8px', borderRadius: '5px', border: 'none',
+                  backgroundColor: isSelected ? '#EEF2FF' : 'transparent',
+                  cursor: 'pointer', textAlign: 'left', transition: 'background-color 0.1s'
+                }}
+                onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.backgroundColor = '#F9FAFB'; }}
+                onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '20px', height: '20px', borderRadius: '50%',
+                    backgroundColor: opt.color, color: 'white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.6rem', fontWeight: 600
+                  }}>
+                    {opt.initials}
+                  </div>
+                  <span style={{ fontSize: '0.8125rem', color: isSelected ? '#4F46E5' : '#374151', fontWeight: isSelected ? 600 : 400 }}>
+                    {opt.name}
+                  </span>
+                </div>
+                {isSelected && (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 6L5 9L10 3" stroke="#4F46E5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const Tasks: React.FC = () => {
   const { focusSession, startFocus, pauseFocus, stopFocus, resetFocus } = useTimer();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const [activePage, setActivePage] = useState(1);
+  const [overduePage, setOverduePage] = useState(1);
+  const [completedPage, setCompletedPage] = useState(1);
+  const pageSize = 20;         // active tasks
+  const sectionPageSize = 5;   // overdue & completed
   const [showForm, setShowForm] = useState(false);
   const [activeDetailsTask, setActiveDetailsTask] = useState<Task | null>(null);
   
   // State for the editable modal to allow typing without instant API calls blocking
   const [modalDraft, setModalDraft] = useState<Task | null>(null);
+
+  const [showStarredOnly, setShowStarredOnly] = useState(false);
 
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ 
@@ -283,10 +794,46 @@ export const Tasks: React.FC = () => {
   } | null>(null);
   const [logTimeTaskId, setLogTimeTaskId] = useState<string | null>(null);
   const [manualTimeInput, setManualTimeInput] = useState('');
+  const [logTimeNotes, setLogTimeNotes] = useState('');
+  const [logTimeTags, setLogTimeTags] = useState('');
+  
+  // Calculate local time for input default
+  const getLocalDatetimeLocal = () => {
+    const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 16);
+    return localISOTime;
+  };
+  const [logTimeStartDate, setLogTimeStartDate] = useState(getLocalDatetimeLocal());
+  const [logTimeEndDate, setLogTimeEndDate] = useState(getLocalDatetimeLocal());
+  const [pastTimeEntries, setPastTimeEntries] = useState<TimeEntry[]>([]);
+
 
   useEffect(() => {
     setManualTimeInput('');
+    setLogTimeNotes('');
+    setLogTimeTags('');
+    setLogTimeStartDate(getLocalDatetimeLocal());
+    setLogTimeEndDate(getLocalDatetimeLocal());
+    if (logTimeTaskId) {
+      timeService.getTimeEntries(logTimeTaskId).then(setPastTimeEntries).catch(console.error);
+    } else {
+      setPastTimeEntries([]);
+    }
   }, [logTimeTaskId]);
+
+  const handleDeleteTimeEntry = async (entryId: string) => {
+    if (window.confirm("Are you sure you want to delete this time entry?")) {
+      try {
+        await timeService.deleteTimeEntry(entryId);
+        setPastTimeEntries(prev => prev.filter(e => e.id !== entryId));
+        showToast("Time entry deleted", "success");
+        fetchTasks();
+      } catch (e: any) {
+        showToast(e.message || "Failed to delete entry", "error");
+      }
+    }
+  };
+
 
   const showToast = (message: string, type: 'error' | 'success' | 'info' = 'error') => {
     setToast({ message, type });
@@ -309,7 +856,22 @@ export const Tasks: React.FC = () => {
       // Clean up the URL so refreshing doesn't keep opening it
       navigate('/tasks', { replace: true });
     }
-  }, [location.search, navigate]);
+    
+    const urlTaskId = params.get('taskId');
+    if (urlTaskId && tasks.length > 0 && !activeDetailsTask) {
+      const taskToOpen = tasks.find(t => t.id === urlTaskId);
+      if (taskToOpen) {
+        setActiveDetailsTask(taskToOpen);
+        // Clean up the URL
+        navigate('/tasks', { replace: true });
+      }
+    }
+    const isStarred = params.get('starred') === 'true';
+    if (isStarred) {
+      setShowStarredOnly(true);
+      navigate('/tasks', { replace: true });
+    }
+  }, [location.search, navigate, tasks, activeDetailsTask]);
 
   const [modalEstTimeInput, setModalEstTimeInput] = useState('');
 
@@ -344,6 +906,29 @@ export const Tasks: React.FC = () => {
   const handleManualTimeBlur = () => {
     const { hours } = parseEstimatedTime(manualTimeInput);
     setManualTimeInput(hours > 0 ? formatHours(hours) : '');
+    if (hours > 0 && logTimeStartDate) {
+      const start = new Date(logTimeStartDate);
+      const end = new Date(start.getTime() + hours * 3600000);
+      const tzOffset = end.getTimezoneOffset() * 60000;
+      const localEnd = (new Date(end.getTime() - tzOffset)).toISOString().slice(0, 16);
+      setLogTimeEndDate(localEnd);
+    }
+  };
+  
+  const handleDateBoundsChange = (startStr: string, endStr: string) => {
+    setLogTimeStartDate(startStr);
+    setLogTimeEndDate(endStr);
+    if (startStr && endStr) {
+      const start = new Date(startStr);
+      const end = new Date(endStr);
+      const diffMs = end.getTime() - start.getTime();
+      if (diffMs > 0) {
+        const hours = diffMs / 3600000;
+        setManualTimeInput(hours.toFixed(2) + 'h');
+      } else {
+        setManualTimeInput('');
+      }
+    }
   };
 
   const handleModalSave = async (field: keyof Task, value: any) => {
@@ -379,15 +964,22 @@ export const Tasks: React.FC = () => {
   const [inlineTaskTitle, setInlineTaskTitle] = useState('');
   const [inlinePriority, setInlinePriority] = useState<'Low' | 'Medium' | 'High' | 'Critical'>('Medium');
   const [inlineEstTime, setInlineEstTime] = useState('');
+  const [inlineDueDate, setInlineDueDate] = useState('');
+  const [inlineAssignees, setInlineAssignees] = useState<string[]>([]);
+  const inlineDateRef = useRef<HTMLInputElement>(null);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
+  
   const [dateFilter, setDateFilter] = useState('All');
+  const [overdueDateFilter, setOverdueDateFilter] = useState('All');
+  const [completedDateFilter, setCompletedDateFilter] = useState('All');
+
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-  const [showCustomDateModal, setShowCustomDateModal] = useState(false);
+  const [customDateTarget, setCustomDateTarget] = useState<'main' | 'overdue' | 'completed' | null>(null);
 
   const fetchTasks = async () => {
     try {
@@ -453,18 +1045,25 @@ export const Tasks: React.FC = () => {
   };
 
   const addInlineTask = async () => {
-    if (!inlineTaskTitle.trim()) return;
+    if (!inlineTaskTitle.trim() || !inlineEstTime.trim() || !inlineDueDate || inlineAssignees.length === 0) {
+      showToast('Please fill out all mandatory fields (Title, Priority, Est Time, Date, Assignee)', 'error');
+      return;
+    }
     try {
-      const today = new Date().toISOString().split('T')[0];
       const { hours } = parseEstimatedTime(inlineEstTime);
+      if (hours <= 0) {
+        showToast('Invalid estimated time', 'error');
+        return;
+      }
       const newTask = await taskService.createTask({
         title: inlineTaskTitle.trim(),
         projectId: 'default',
-        assignedUserId: 'self',
+        assignedUserId: inlineAssignees[0],
+        assignees: inlineAssignees,
         priority: inlinePriority,
-        estimatedHours: hours > 0 ? hours : 1,
-        startDate: today,
-        dueDate: today,
+        estimatedHours: hours,
+        startDate: inlineDueDate,
+        dueDate: inlineDueDate,
         status: 'Todo',
         order: tasks.length
       });
@@ -472,6 +1071,8 @@ export const Tasks: React.FC = () => {
       setInlineTaskTitle('');
       setInlinePriority('Medium');
       setInlineEstTime('');
+      setInlineDueDate('');
+      setInlineAssignees([]);
       showToast('Task added!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to add task', 'error');
@@ -508,12 +1109,23 @@ export const Tasks: React.FC = () => {
       showToast(e.message || "Failed to update status", 'error');
     }
   };
+
+  const handleToggleStar = async (id: string) => {
+    try {
+      const updatedTask = await taskService.toggleTaskStar(id);
+      // Merge the result — if the backend returned a partial stub, preserve existing task fields
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updatedTask } : t));
+    } catch (e: any) {
+      // toggleTaskStar no longer throws, but keep this as a safety net
+      console.warn('Star toggle failed silently:', e?.message);
+    }
+  };
   
   const toggleSelectAll = () => {
-    if (selectedTaskIds.length === filteredTasks.length) {
+    if (selectedTaskIds.length === baseFilteredTasks.length) {
       setSelectedTaskIds([]);
     } else {
-      setSelectedTaskIds(filteredTasks.map(t => t.id));
+      setSelectedTaskIds(baseFilteredTasks.map(t => t.id));
     }
   };
 
@@ -598,87 +1210,83 @@ export const Tasks: React.FC = () => {
   const totalEst = tasks.reduce((sum, t) => sum + t.estimatedHours, 0);
   const totalAct = tasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
 
-  // Filtered Tasks
-  const filteredTasks = tasks.filter(t => {
-    const matchesSearch = t.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || t.status === statusFilter;
-    const matchesPriority = priorityFilter === 'All' || t.priority === priorityFilter;
-    
-    let matchesDate = true;
-    if (dateFilter !== 'All') {
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
-      
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+  // Helper to filter a task by date
+  const filterTaskByDate = (t: Task, filterVal: string) => {
+    if (filterVal === 'All') return true;
 
-      const eow = new Date(today);
-      const daysUntilSunday = eow.getDay() === 0 ? 0 : 7 - eow.getDay();
-      eow.setDate(eow.getDate() + daysUntilSunday);
-      const eowStr = eow.toISOString().split('T')[0];
+    const todayObj = new Date();
+    const todayStr = todayObj.toISOString().split('T')[0];
 
-      if (dateFilter === 'Today') {
-        matchesDate = t.dueDate === todayStr;
-      } else if (dateFilter === 'Yesterday') {
-        matchesDate = t.dueDate === yesterdayStr;
-      } else if (dateFilter === 'This Week') {
-        matchesDate = t.dueDate >= todayStr && t.dueDate <= eowStr;
-      } else if (dateFilter === 'Custom Date' && (customStartDate || customEndDate)) {
-        if (customStartDate && customEndDate) {
-          matchesDate = t.dueDate >= customStartDate && t.dueDate <= customEndDate;
-        } else if (customStartDate) {
-          matchesDate = t.dueDate >= customStartDate;
-        } else if (customEndDate) {
-          matchesDate = t.dueDate <= customEndDate;
-        }
-      }
+    const yesterday = new Date(todayObj);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    // Compute Monday (start) and Sunday (end) of the current calendar week
+    const dow = todayObj.getDay(); // 0=Sun, 1=Mon … 6=Sat
+    const diffToMon = dow === 0 ? -6 : 1 - dow; // days back to Monday
+    const weekStart = new Date(todayObj);
+    weekStart.setDate(todayObj.getDate() + diffToMon);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6); // Sunday
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    const weekEndStr   = weekEnd.toISOString().split('T')[0];
+
+    if (filterVal === 'Today') return t.dueDate === todayStr;
+    if (filterVal === 'Yesterday') return t.dueDate === yesterdayStr;
+    // "This Week" = any task whose dueDate falls within Mon–Sun of this week
+    if (filterVal === 'This Week') return t.dueDate >= weekStartStr && t.dueDate <= weekEndStr;
+    if (filterVal === 'Custom Date' && (customStartDate || customEndDate)) {
+      if (customStartDate && customEndDate) return t.dueDate >= customStartDate && t.dueDate <= customEndDate;
+      if (customStartDate) return t.dueDate >= customStartDate;
+      if (customEndDate) return t.dueDate <= customEndDate;
     }
+    return true;
+  };
 
-    return matchesSearch && matchesStatus && matchesPriority && matchesDate;
+  // Base list applying search, priority, and status (status 'Completed' is excluded from main list, so we handle it)
+  const baseFilteredTasks = tasks.filter(t => {
+    if (showStarredOnly && !t.isStarred) return false;
+    const matchesSearch = t.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesPriority = priorityFilter === 'All' || t.priority === priorityFilter;
+    return matchesSearch && matchesPriority;
   });
+
+  const activeTasks = baseFilteredTasks.filter(t => 
+    t.status !== 'Completed' && 
+    !(t.dueDate < today && t.status !== 'Completed') && 
+    (statusFilter === 'All' || t.status === statusFilter) &&
+    filterTaskByDate(t, dateFilter)
+  );
+
+  // Base lists (no date filter) — used to decide whether to show the section at all
+  const overdueBase = baseFilteredTasks.filter(t =>
+    t.dueDate < today && t.status !== 'Completed' &&
+    (statusFilter === 'All' || t.status === statusFilter)
+  );
+  const completedBase = baseFilteredTasks.filter(t => t.status === 'Completed');
+
+  // Date-filtered lists (used for actual display)
+  const overdueTasksList = overdueBase.filter(t => filterTaskByDate(t, overdueDateFilter));
+  const completedTasksList = completedBase.filter(t => filterTaskByDate(t, completedDateFilter));
+
+  const paginatedActive = activeTasks.slice((activePage - 1) * pageSize, activePage * pageSize);
+  const paginatedOverdue = overdueTasksList.slice((overduePage - 1) * sectionPageSize, overduePage * sectionPageSize);
+  const paginatedCompleted = completedTasksList.slice((completedPage - 1) * sectionPageSize, completedPage * sectionPageSize);
+  const overdueTotalPages = Math.ceil(overdueTasksList.length / sectionPageSize);
+  const completedTotalPages = Math.ceil(completedTasksList.length / sectionPageSize);
 
   const clearFilters = () => {
     setSearchTerm('');
     setStatusFilter('All');
     setPriorityFilter('All');
     setDateFilter('All');
+    setOverdueDateFilter('All');
+    setCompletedDateFilter('All');
     setCustomStartDate('');
     setCustomEndDate('');
   };
 
-  const selectWrapperStyle = { 
-    display: 'flex', 
-    alignItems: 'center', 
-    backgroundColor: '#F3F4F6', 
-    padding: '8px 16px', 
-    borderRadius: '24px', 
-    border: '1px solid transparent',
-    transition: 'all 0.2s',
-    cursor: 'pointer',
-    position: 'relative' as const
-  };
 
-  const selectStyle = { 
-    appearance: 'none' as const,
-    WebkitAppearance: 'none' as const,
-    border: 'none', 
-    outline: 'none', 
-    fontSize: '0.875rem', 
-    fontWeight: 500, 
-    backgroundColor: 'transparent', 
-    cursor: 'pointer',
-    color: '#374151',
-    paddingRight: '24px',
-    width: '100%'
-  };
-
-  const selectIconStyle = {
-    position: 'absolute' as const,
-    right: '12px',
-    pointerEvents: 'none' as const,
-    color: '#6B7280'
-  };
 
   const statCardStyle = { flex: 1, minWidth: '140px', backgroundColor: '#FFFFFF', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', display: 'flex', gap: '8px', alignItems: 'center' };
 
@@ -744,14 +1352,14 @@ export const Tasks: React.FC = () => {
           <div style={{ backgroundColor: '#F0FDF4', padding: '6px', borderRadius: '6px', color: '#0891B2' }}><Clock size={16} /></div>
           <div>
             <div style={{ fontSize: '0.7rem', color: '#6B7280', fontWeight: 500 }}>Est. Hours</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#111827' }}>{parseFloat(totalEst.toFixed(1))}h</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#111827' }}>{parseFloat(totalEst.toFixed(1))}H</div>
           </div>
         </div>
         <div style={statCardStyle}>
           <div style={{ backgroundColor: '#FAF5FF', padding: '6px', borderRadius: '6px', color: '#9333EA' }}><Clock size={16} /></div>
           <div>
             <div style={{ fontSize: '0.7rem', color: '#6B7280', fontWeight: 500 }}>Log Hours</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#111827' }}>{parseFloat(totalAct.toFixed(1))}h</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#111827' }}>{parseFloat(totalAct.toFixed(1))}H</div>
           </div>
         </div>
       </div>
@@ -759,6 +1367,24 @@ export const Tasks: React.FC = () => {
       {/* Filter Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button 
+            onClick={() => setShowStarredOnly(!showStarredOnly)}
+            title={showStarredOnly ? 'Show all tasks' : 'Show starred only'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '5px',
+              padding: '7px 12px', borderRadius: '7px',
+              border: `1px solid ${showStarredOnly ? '#FCD34D' : 'var(--color-border)'}`,
+              backgroundColor: showStarredOnly ? '#FFFBEB' : '#FFFFFF',
+              color: showStarredOnly ? '#B45309' : '#6B7280',
+              fontWeight: 500, fontSize: '0.8125rem', cursor: 'pointer',
+              transition: 'all 0.15s', whiteSpace: 'nowrap'
+            }}
+          >
+            <span style={{ fontSize: '15px', lineHeight: 1, color: showStarredOnly ? '#F59E0B' : '#D1D5DB' }}>
+              {showStarredOnly ? '★' : '☆'}
+            </span>
+            Starred
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#FFFFFF', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', width: '250px' }}>
             <Search size={16} color="#9CA3AF" style={{ marginRight: '8px' }} />
             <input 
@@ -770,50 +1396,48 @@ export const Tasks: React.FC = () => {
             />
           </div>
           
-          <div style={selectWrapperStyle} className="filter-dropdown">
-            <span style={{ fontSize: '0.875rem', color: '#6B7280', marginRight: '8px' }}>Status:</span>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
-              <option value="All">All</option>
-              <option value="Todo">Todo</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Review">Review</option>
-              <option value="Completed">Completed</option>
-            </select>
-            <ChevronDown size={14} style={selectIconStyle} />
-          </div>
+          <DateFilterSelect
+            value={statusFilter}
+            onChange={setStatusFilter}
+            label="Status: "
+            options={[
+              { value: 'All', label: 'All' },
+              { value: 'Todo', label: 'Todo' },
+              { value: 'In Progress', label: 'In Progress' },
+              { value: 'Review', label: 'Review' },
+              { value: 'Blocked', label: 'Blocked' },
+            ]}
+          />
 
-          <div style={selectWrapperStyle} className="filter-dropdown">
-            <span style={{ fontSize: '0.875rem', color: '#6B7280', marginRight: '8px' }}>Priority:</span>
-            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} style={selectStyle}>
-              <option value="All">All</option>
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-              <option value="Critical">Critical</option>
-            </select>
-            <ChevronDown size={14} style={selectIconStyle} />
-          </div>
+          <DateFilterSelect
+            value={priorityFilter}
+            onChange={setPriorityFilter}
+            label="Priority: "
+            options={[
+              { value: 'All', label: 'All' },
+              { value: 'Low', label: 'Low' },
+              { value: 'Medium', label: 'Medium' },
+              { value: 'High', label: 'High' },
+              { value: 'Critical', label: 'Critical' },
+            ]}
+          />
 
-          <div style={selectWrapperStyle} className="filter-dropdown">
-            <span style={{ fontSize: '0.875rem', color: '#6B7280', marginRight: '8px' }}>Timeframe:</span>
-            <select value={dateFilter} onChange={(e) => {
-              setDateFilter(e.target.value);
-              if (e.target.value === 'Custom Date') {
-                setShowCustomDateModal(true);
-              }
-            }} style={selectStyle}>
-              <option value="All">All Time</option>
-              <option value="Today">Today</option>
-              <option value="Yesterday">Yesterday</option>
-              <option value="This Week">This Week</option>
-              <option value="Custom Date">Custom Date</option>
-            </select>
-            <ChevronDown size={14} style={selectIconStyle} />
-          </div>
+          <DateFilterSelect
+            value={dateFilter}
+            onChange={(v) => { setDateFilter(v); if (v === 'Custom Date') setCustomDateTarget('main'); }}
+            label="Timeframe: "
+            options={[
+              { value: 'All', label: 'All Time' },
+              { value: 'Today', label: 'Today' },
+              { value: 'Yesterday', label: 'Yesterday' },
+              { value: 'This Week', label: 'This Week' },
+              { value: 'Custom Date', label: 'Custom Date' },
+            ]}
+          />
           
           {dateFilter === 'Custom Date' && (
             <button 
-              onClick={() => setShowCustomDateModal(true)}
+              onClick={() => setCustomDateTarget('main')}
               style={{ display: 'flex', alignItems: 'center', backgroundColor: '#F3F4F6', padding: '8px 16px', borderRadius: '24px', border: '1px solid #E5E7EB', fontSize: '0.875rem', fontWeight: 500, color: '#374151', cursor: 'pointer' }}
             >
               <CalendarIcon size={14} style={{ marginRight: '8px', color: '#6B7280' }} />
@@ -838,25 +1462,23 @@ export const Tasks: React.FC = () => {
                   <tr style={{ color: '#6B7280', borderBottom: '1px solid var(--color-border)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     <th style={{ padding: '12px 0', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{ width: '14px' }}></div>
-                      <input type="checkbox" checked={selectedTaskIds.length > 0 && selectedTaskIds.length === filteredTasks.length} onChange={toggleSelectAll} style={{ cursor: 'pointer' }} />
+                      <input type="checkbox" checked={selectedTaskIds.length > 0 && selectedTaskIds.length === baseFilteredTasks.length} onChange={toggleSelectAll} style={{ cursor: 'pointer' }} />
                       Task Title
                     </th>
                     <th style={{ padding: '12px 0', fontWeight: 600 }}>Priority</th>
                     <th style={{ padding: '12px 0', fontWeight: 600 }}>Status</th>
-                    <th style={{ padding: '12px 0', fontWeight: 600 }}>Est. Hours</th>
-                    <th style={{ padding: '12px 0', fontWeight: 600 }}>Logged Hours</th>
-                    <th style={{ padding: '12px 0', fontWeight: 600 }}>Remaining</th>
+                    <th style={{ padding: '12px 0', fontWeight: 600 }}>Assignee</th>
                     <th style={{ padding: '12px 0', fontWeight: 600 }}>Progress</th>
                     <th style={{ padding: '12px 0', fontWeight: 600 }}>Due Date</th>
                     <th style={{ padding: '12px 0', fontWeight: 600 }}>Created</th>
                     <th style={{ padding: '12px 0', fontWeight: 600 }}></th>
                   </tr>
                 </thead>
-                <SortableContext items={filteredTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                <SortableContext items={activeTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                   <tbody>
-                    {filteredTasks.length === 0 ? (
-                      <tr><td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#6B7280' }}>No tasks found matching your filters.</td></tr>
-                    ) : filteredTasks.map(task => (
+                    {paginatedActive.length === 0 ? (
+                      <tr><td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#6B7280' }}>No pending tasks found.</td></tr>
+                    ) : paginatedActive.map(task => (
                       <SortableRow 
                         key={task.id} 
                         task={task} 
@@ -869,6 +1491,7 @@ export const Tasks: React.FC = () => {
                         onTimeLogged={fetchTasks}
                         isOverdue={task.dueDate < today && task.status !== 'Completed'}
                         onStartFocus={handleStartFocusSprint}
+                        onToggleStar={handleToggleStar}
                       />
                     ))}
                     
@@ -920,21 +1543,54 @@ export const Tasks: React.FC = () => {
                             style={{
                               border: '1px solid #E5E7EB', borderRadius: '6px', padding: '5px 8px',
                               fontSize: '0.8125rem', backgroundColor: '#FFFFFF', color: '#374151',
-                              outline: 'none', width: '120px', flexShrink: 0
+                              outline: 'none', width: '90px', flexShrink: 0
                             }}
+                          />
+
+                          {/* Styled Date Picker */}
+                          <div style={{ position: 'relative', flexShrink: 0 }}>
+                            <button
+                              type="button"
+                              onClick={() => (inlineDateRef.current as any)?.showPicker?.()}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '6px',
+                                border: '1px solid #E5E7EB', borderRadius: '6px', padding: '5px 10px',
+                                fontSize: '0.8125rem', backgroundColor: '#FFFFFF', color: inlineDueDate ? '#111827' : '#9CA3AF',
+                                outline: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: inlineDueDate ? 500 : 400
+                              }}
+                            >
+                              <CalendarIcon size={13} color={inlineDueDate ? '#4F46E5' : '#9CA3AF'} />
+                              {inlineDueDate ? new Date(inlineDueDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Due date'}
+                            </button>
+                            <input
+                              ref={inlineDateRef}
+                              type="date"
+                              value={inlineDueDate}
+                              onChange={(e) => setInlineDueDate(e.target.value)}
+                              style={{
+                                position: 'absolute', opacity: 0, width: '1px', height: '1px',
+                                top: 0, left: 0, pointerEvents: 'none'
+                              }}
+                            />
+                          </div>
+
+                          {/* Assignee Multi-Select Dropdown */}
+                          <QuickAddAssigneeSelect 
+                            selectedIds={inlineAssignees}
+                            onChange={setInlineAssignees}
+                            options={SAMPLE_TEAM_MEMBERS}
                           />
 
                           {/* Add Button */}
                           <button
                             onClick={addInlineTask}
-                            disabled={!inlineTaskTitle.trim()}
+                            disabled={!inlineTaskTitle.trim() || !inlineEstTime.trim() || !inlineDueDate || inlineAssignees.length === 0}
                             style={{
-                              display: 'flex', alignItems: 'center', gap: '4px',
-                              backgroundColor: inlineTaskTitle.trim() ? '#2563EB' : '#E5E7EB',
-                              color: inlineTaskTitle.trim() ? '#FFFFFF' : '#9CA3AF',
-                              border: 'none', borderRadius: '6px',
-                              padding: '6px 12px', fontSize: '0.8125rem', fontWeight: 600,
-                              cursor: inlineTaskTitle.trim() ? 'pointer' : 'not-allowed',
+                              marginLeft: 'auto', padding: '6px 12px', borderRadius: '6px', border: 'none',
+                              backgroundColor: (inlineTaskTitle.trim() && inlineEstTime.trim() && inlineDueDate && inlineAssignees.length > 0) ? '#4F46E5' : '#E5E7EB',
+                              color: (inlineTaskTitle.trim() && inlineEstTime.trim() && inlineDueDate && inlineAssignees.length > 0) ? 'white' : '#9CA3AF',
+                              fontSize: '0.8125rem', fontWeight: 600,
+                              cursor: (inlineTaskTitle.trim() && inlineEstTime.trim() && inlineDueDate && inlineAssignees.length > 0) ? 'pointer' : 'not-allowed',
                               transition: 'all 0.15s ease', whiteSpace: 'nowrap', flexShrink: 0
                             }}
                           >
@@ -948,8 +1604,197 @@ export const Tasks: React.FC = () => {
                 </SortableContext>
               </table>
             </DndContext>
+            <Pagination currentPage={activePage} totalItems={activeTasks.length} pageSize={pageSize} onPageChange={setActivePage} />
           </div>
         </div>
+
+      {/* Overdue Tasks Table — always visible when any overdue tasks exist */}
+      {overdueBase.length > 0 && (
+        <div style={{ marginTop: '32px', backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+          <div style={{ padding: '14px 24px', backgroundColor: '#FEF2F2', borderBottom: '1px solid #FECACA', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, color: '#991B1B', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CalendarIcon size={16} /> Overdue Tasks
+              <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#DC2626', backgroundColor: '#FEE2E2', padding: '1px 8px', borderRadius: '99px', marginLeft: '4px' }}>{overdueTasksList.length}</span>
+            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {/* Date filter */}
+              <DateFilterSelect
+                value={overdueDateFilter}
+                onChange={(v) => { setOverdueDateFilter(v); if (v === 'Custom Date') setCustomDateTarget('overdue'); }}
+                options={[
+                  { value: 'All', label: 'All Time' },
+                  { value: 'Today', label: 'Today' },
+                  { value: 'Yesterday', label: 'Yesterday' },
+                  { value: 'This Week', label: 'This Week' },
+                  { value: 'Custom Date', label: 'Custom Date' },
+                ]}
+                accentColor="#991B1B"
+                accentBg="#FEF2F2"
+              />
+              {/* Inline pagination arrows */}
+              {overdueTotalPages > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    onClick={() => setOverduePage(p => Math.max(1, p - 1))}
+                    disabled={overduePage === 1}
+                    style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', border: '1px solid #FECACA', backgroundColor: overduePage === 1 ? '#FEF2F2' : '#FFFFFF', color: overduePage === 1 ? '#FCA5A5' : '#991B1B', cursor: overduePage === 1 ? 'not-allowed' : 'pointer', fontSize: '0.875rem', fontWeight: 700, transition: 'all 0.15s' }}
+                  >‹</button>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#991B1B', minWidth: '52px', textAlign: 'center' }}>{overduePage} / {overdueTotalPages}</span>
+                  <button
+                    onClick={() => setOverduePage(p => Math.min(overdueTotalPages, p + 1))}
+                    disabled={overduePage === overdueTotalPages}
+                    style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', border: '1px solid #FECACA', backgroundColor: overduePage === overdueTotalPages ? '#FEF2F2' : '#FFFFFF', color: overduePage === overdueTotalPages ? '#FCA5A5' : '#991B1B', cursor: overduePage === overdueTotalPages ? 'not-allowed' : 'pointer', fontSize: '0.875rem', fontWeight: 700, transition: 'all 0.15s' }}
+                  >›</button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto', padding: '0 24px 16px 24px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ color: '#6B7280', borderBottom: '1px solid var(--color-border)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Task Title</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Priority</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Status</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Assignee</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Progress</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Due Date</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Created</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {overdueTasksList.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ padding: '40px 0', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                        <CalendarIcon size={32} color="#FECACA" />
+                        <p style={{ margin: 0, fontWeight: 600, color: '#991B1B', fontSize: '0.9rem' }}>No overdue tasks for this period</p>
+                        <p style={{ margin: 0, color: '#B91C1C', fontSize: '0.8rem' }}>Try a different date filter or select "All Time"</p>
+                        <button
+                          onClick={() => { setOverdueDateFilter('All'); setOverduePage(1); }}
+                          style={{ marginTop: '4px', padding: '6px 16px', borderRadius: '6px', border: '1px solid #FECACA', backgroundColor: '#FFFFFF', color: '#991B1B', fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer' }}
+                        >Clear Filter</button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedOverdue.map(task => (
+                    <StaticRow
+                      key={task.id}
+                      task={task}
+                      isSelected={selectedTaskIds.includes(task.id)}
+                      onToggleSelect={toggleSelect}
+                      onLogTime={setLogTimeTaskId}
+                      onDelete={handleDelete}
+                      onViewDetails={setActiveDetailsTask}
+                      onStatusChange={handleStatusChange}
+                      onTimeLogged={fetchTasks}
+                      isOverdue={true}
+                      onStartFocus={handleStartFocusSprint}
+                      onToggleStar={handleToggleStar}
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Completed Tasks Table — always visible when any completed tasks exist */}
+      {completedBase.length > 0 && (
+        <div style={{ marginTop: '32px', backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+          <div style={{ padding: '14px 24px', backgroundColor: '#F0FDF4', borderBottom: '1px solid #A7F3D0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, color: '#065F46', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle2 size={16} /> Completed Tasks
+              <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#059669', backgroundColor: '#D1FAE5', padding: '1px 8px', borderRadius: '99px', marginLeft: '4px' }}>{completedTasksList.length}</span>
+            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {/* Date filter */}
+              <DateFilterSelect
+                value={completedDateFilter}
+                onChange={(v) => { setCompletedDateFilter(v); if (v === 'Custom Date') setCustomDateTarget('completed'); }}
+                options={[
+                  { value: 'All', label: 'All Time' },
+                  { value: 'Today', label: 'Today' },
+                  { value: 'Yesterday', label: 'Yesterday' },
+                  { value: 'This Week', label: 'This Week' },
+                  { value: 'Custom Date', label: 'Custom Date' },
+                ]}
+                accentColor="#065F46"
+                accentBg="#F0FDF4"
+              />
+              {/* Inline pagination arrows */}
+              {completedTotalPages > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    onClick={() => setCompletedPage(p => Math.max(1, p - 1))}
+                    disabled={completedPage === 1}
+                    style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', border: '1px solid #A7F3D0', backgroundColor: completedPage === 1 ? '#F0FDF4' : '#FFFFFF', color: completedPage === 1 ? '#6EE7B7' : '#065F46', cursor: completedPage === 1 ? 'not-allowed' : 'pointer', fontSize: '0.875rem', fontWeight: 700, transition: 'all 0.15s' }}
+                  >‹</button>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#065F46', minWidth: '52px', textAlign: 'center' }}>{completedPage} / {completedTotalPages}</span>
+                  <button
+                    onClick={() => setCompletedPage(p => Math.min(completedTotalPages, p + 1))}
+                    disabled={completedPage === completedTotalPages}
+                    style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', border: '1px solid #A7F3D0', backgroundColor: completedPage === completedTotalPages ? '#F0FDF4' : '#FFFFFF', color: completedPage === completedTotalPages ? '#6EE7B7' : '#065F46', cursor: completedPage === completedTotalPages ? 'not-allowed' : 'pointer', fontSize: '0.875rem', fontWeight: 700, transition: 'all 0.15s' }}
+                  >›</button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto', padding: '0 24px 16px 24px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ color: '#6B7280', borderBottom: '1px solid var(--color-border)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Task Title</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Priority</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Status</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Assignee</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Progress</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Due Date</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}>Created</th>
+                  <th style={{ padding: '12px 0', fontWeight: 600 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {completedTasksList.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ padding: '40px 0', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                        <CheckCircle2 size={32} color="#A7F3D0" />
+                        <p style={{ margin: 0, fontWeight: 600, color: '#065F46', fontSize: '0.9rem' }}>No completed tasks for this period</p>
+                        <p style={{ margin: 0, color: '#047857', fontSize: '0.8rem' }}>Try a different date filter or select "All Time"</p>
+                        <button
+                          onClick={() => { setCompletedDateFilter('All'); setCompletedPage(1); }}
+                          style={{ marginTop: '4px', padding: '6px 16px', borderRadius: '6px', border: '1px solid #A7F3D0', backgroundColor: '#FFFFFF', color: '#065F46', fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer' }}
+                        >Clear Filter</button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedCompleted.map(task => (
+                    <StaticRow
+                      key={task.id}
+                      task={task}
+                      isSelected={selectedTaskIds.includes(task.id)}
+                      onToggleSelect={toggleSelect}
+                      onLogTime={setLogTimeTaskId}
+                      onDelete={handleDelete}
+                      onViewDetails={setActiveDetailsTask}
+                      onStatusChange={handleStatusChange}
+                      onTimeLogged={fetchTasks}
+                      isOverdue={false}
+                      onStartFocus={handleStartFocusSprint}
+                      onToggleStar={handleToggleStar}
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Floating Action Bar */}
       {selectedTaskIds.length > 0 && (
@@ -1212,59 +2057,179 @@ export const Tasks: React.FC = () => {
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
             border: '1px solid #E5E7EB'
           }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '1.125rem', fontWeight: 600, color: '#111827' }}>Log Time Manually</h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: '0.8125rem', color: '#6B7280' }}>
-              Logging time for: <strong>{tasks.find(t => t.id === logTimeTaskId)?.title}</strong>
-            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.25rem', fontWeight: 600, color: '#111827' }}>Time on all tasks</h3>
+                <p style={{ margin: 0, fontSize: '0.8125rem', color: '#6B7280' }}>
+                  Logging time for: <strong>{tasks.find(t => t.id === logTimeTaskId)?.title}</strong>
+                </p>
+              </div>
+            </div>
             
             <form onSubmit={async (e) => {
               e.preventDefault();
               const { hours } = parseEstimatedTime(manualTimeInput);
               if (hours <= 0) {
+                // If it's empty, and the user just clicked Save to close, we should just close it without error
+                if (!manualTimeInput.trim()) {
+                  setLogTimeTaskId(null);
+                  return;
+                }
                 showToast("Invalid time format (e.g. use 1.5, 2h, or 1h 30m).", "error");
                 return;
               }
               
-              const form = e.currentTarget;
-              const notesVal = (form.elements.namedItem('notes') as HTMLInputElement).value;
-              
               try {
+                // Ensure date formatting is correct for the backend
+                const dateOnly = logTimeStartDate.split('T')[0];
+                const startIso = logTimeStartDate ? new Date(logTimeStartDate).toISOString() : undefined;
+                const endIso = logTimeEndDate ? new Date(logTimeEndDate).toISOString() : undefined;
+                
                 await timeService.createTimeEntry({
                   task_id: logTimeTaskId,
-                  date: new Date().toISOString().split('T')[0],
+                  date: dateOnly,
+                  start_time: startIso,
+                  end_time: endIso,
                   hours_worked: hours,
-                  notes: notesVal || 'Logged manually'
+                  notes: logTimeNotes || 'Logged manually',
+                  tags: logTimeTags || undefined
                 });
                 showToast("Time logged successfully!", "success");
-                setLogTimeTaskId(null);
-                fetchTasks();
+                
+                // Check Auto-completion
+                const task = tasks.find(t => t.id === logTimeTaskId);
+                if (task) {
+                  const newActualHours = (task.actualHours || 0) + hours;
+                  
+                  // Optimistically update the local task state so handleStatusChange sees it
+                  const updatedTasks = tasks.map(t => t.id === logTimeTaskId ? { ...t, actualHours: newActualHours } : t);
+                  setTasks(updatedTasks);
+                  
+                  if (task.estimatedHours > 0 && newActualHours >= task.estimatedHours && task.status !== 'Completed') {
+                     // Pass the updated task directly if needed, but since we just set state,
+                     // it might not be available in the closure yet. Let's fetch from backend just to be safe.
+                     await fetchTasks();
+                     
+                     // Backend might have auto-completed it already! (time_service.py does this)
+                     // So let's check if we still need to manually call handleStatusChange
+                  } else {
+                     fetchTasks();
+                  }
+                } else {
+                  fetchTasks();
+                }
+                
+                // Refresh list directly so user sees it instantly
+                timeService.getTimeEntries(logTimeTaskId).then(setPastTimeEntries).catch(console.error);
+                
+                // Clear inputs
+                setManualTimeInput('');
+                setLogTimeNotes('');
+                setLogTimeTags('');
               } catch (err: any) {
-                showToast(err.message || "Failed to log time", "error");
+                let msg = err.message || "Failed to log time";
+                if (Array.isArray(err.detail)) {
+                  msg = err.detail.map((e: any) => e.msg).join(', ');
+                }
+                showToast(msg, "error");
               }
             }}>
-              <div style={{ marginBottom: '16px', position: 'relative' }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', marginBottom: '4px' }}>Time Spent</label>
-                <input 
-                  required 
-                  type="text" 
-                  name="time" 
-                  placeholder="e.g. 1.5, 2h 30m, 45m" 
-                  value={manualTimeInput}
-                  onChange={(e) => handleManualTimeChange(e.target.value)}
-                  onBlur={handleManualTimeBlur}
-                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #E5E7EB', fontSize: '0.875rem', outline: 'none' }} 
-                />
-              </div>
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', marginBottom: '4px' }}>Notes</label>
-                <input type="text" name="notes" placeholder="What did you do?" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #E5E7EB', fontSize: '0.875rem', outline: 'none' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+                <div>
+                  <input 
+                    type="text" 
+                    placeholder="Enter time (ex: 3h 20m) or start timer" 
+                    value={manualTimeInput}
+                    onChange={(e) => handleManualTimeChange(e.target.value)}
+                    onBlur={handleManualTimeBlur}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '0.875rem', outline: 'none' }} 
+                  />
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input 
+                    type="datetime-local" 
+                    value={logTimeStartDate}
+                    onChange={e => handleDateBoundsChange(e.target.value, logTimeEndDate)}
+                    style={{ padding: '6px 4px', borderRadius: '4px', border: '1px solid #D1D5DB', fontSize: '0.75rem', outline: 'none', flex: 1, minWidth: 0 }}
+                  />
+                  <span style={{ fontSize: '0.8125rem', color: '#6B7280', flexShrink: 0 }}>to</span>
+                  <input 
+                    type="datetime-local" 
+                    value={logTimeEndDate}
+                    onChange={e => handleDateBoundsChange(logTimeStartDate, e.target.value)}
+                    style={{ padding: '6px 4px', borderRadius: '4px', border: '1px solid #D1D5DB', fontSize: '0.75rem', outline: 'none', flex: 1, minWidth: 0 }}
+                  />
+                </div>
+
+                <div>
+                  <textarea 
+                    placeholder="Notes" 
+                    value={logTimeNotes}
+                    onChange={e => setLogTimeNotes(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '0.875rem', outline: 'none', resize: 'vertical', minHeight: '60px' }} 
+                  />
+                </div>
+                
+                <div>
+                  <div style={{ position: 'relative' }}>
+                    <TagIcon size={14} color="#9CA3AF" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input 
+                      type="text" 
+                      placeholder="Add tags" 
+                      value={logTimeTags}
+                      onChange={e => setLogTimeTags(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px 8px 30px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '0.875rem', outline: 'none' }} 
+                    />
+                  </div>
+                </div>
               </div>
               
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                <button type="button" onClick={() => setLogTimeTaskId(null)} className="btn-paper">Cancel</button>
-                <button type="submit" className="btn-paper btn-paper-primary">Log Time</button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E5E7EB', paddingBottom: '20px', marginBottom: '20px' }}>
+                <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
+                  {(() => {
+                    const totalHours = pastTimeEntries.reduce((acc, e) => acc + (e.hours_worked || 0), 0);
+                    return `Total logged: ${formatHoursCompact(totalHours)}`;
+                  })()}
+                </span>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button type="button" onClick={() => setLogTimeTaskId(null)} className="btn-paper">Close</button>
+                  <button type="submit" className="btn-paper btn-paper-primary">Save</button>
+                </div>
               </div>
             </form>
+            
+            <div>
+              <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151', margin: '0 0 12px 0' }}>Time Entries</h4>
+              {pastTimeEntries.length === 0 ? (
+                <div style={{ fontSize: '0.8125rem', color: '#9CA3AF', textAlign: 'center', padding: '12px 0' }}>No time entries found for this task.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+                  {pastTimeEntries.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(entry => (
+                    <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', border: '1px solid #E5E7EB', borderRadius: '6px', backgroundColor: '#F9FAFB' }}>
+                      <div>
+                        <div style={{ fontSize: '0.8125rem', fontWeight: 500, color: '#111827', marginBottom: '4px' }}>
+                           {new Date(entry.start_time || entry.date).toLocaleDateString([], {weekday: 'short', month: 'short', day: 'numeric'})}
+                           {entry.start_time && (
+                             <span style={{ color: '#6B7280', marginLeft: '6px', fontWeight: 400 }}>
+                               {new Date(entry.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                             </span>
+                           )}
+                        </div>
+                        {entry.notes && <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>{entry.notes}</div>}
+                        {entry.tags && <div style={{ fontSize: '0.7rem', color: '#4F46E5', marginTop: '4px' }}>#{entry.tags}</div>}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                         <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827' }}>{formatHoursCompact(entry.hours_worked)}</span>
+                         <button onClick={() => handleDeleteTimeEntry(entry.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                           <Trash2 size={14} color="#EF4444" />
+                         </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1389,12 +2354,12 @@ export const Tasks: React.FC = () => {
         </div>
       )}
       {/* Custom Date Modal */}
-      {showCustomDateModal && (
+      {customDateTarget && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '24px', width: '400px', maxWidth: '90%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>Select Date Range</h2>
-              <button onClick={() => setShowCustomDateModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#6B7280" /></button>
+              <button onClick={() => setCustomDateTarget(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#6B7280" /></button>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1429,7 +2394,7 @@ export const Tasks: React.FC = () => {
                   Clear
                 </button>
                 <button 
-                  onClick={() => setShowCustomDateModal(false)}
+                  onClick={() => setCustomDateTarget(null)}
                   style={{ padding: '8px 16px', backgroundColor: '#2563EB', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 500 }}
                 >
                   Apply Range

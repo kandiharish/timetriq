@@ -37,12 +37,10 @@ def init_firebase():
                 firebase_admin.initialize_app(cred)
                 logger.info("Firebase initialized using credentials file path.")
             else:
-                # Default init (relies on GOOGLE_APPLICATION_CREDENTIALS)
-                firebase_admin.initialize_app()
-                logger.info("Firebase initialized using default credentials.")
+                raise ValueError("No Firebase credentials found! Please set FIREBASE_CREDENTIALS_BASE64 in your Render Environment Variables.")
         except Exception as e:
             logger.error(f"Failed to initialize Firebase: {e}")
-            raise RuntimeError(f"Firebase initialization failed: {e}. Please ensure FIREBASE_CREDENTIALS_BASE64 is correctly configured in Render.")
+            raise RuntimeError(f"Firebase initialization failed: {e}")
 
     try:
         db = firestore.client()

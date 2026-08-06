@@ -49,8 +49,28 @@ def create_time_entry(user_id: str, entry_in: TimeEntryCreate) -> TimeEntryInDB:
         updates['status'] = 'Completed'
         updates['completedDate'] = datetime.now(timezone.utc).strftime('%Y-%m-%d')
         
-    task_ref = db.collection('tasks').document(entry_in.task_id)
+    task_ref = db.collection('tasks').document(task.id)
     task_ref.update(updates)
+
+    # ─── Generate Notification for Manager ───
+    if getattr(task, 'assignedByUid', None) and task.assignedByUid != user_id:
+        notif_ref = db.collection("notifications").document()
+        msg = f"Time logged: {entry_in.hours_worked}h on '{task.title}'."
+        if 'status' in updates and updates['status'] == 'Completed':
+            msg = f"Task Completed! {entry_in.hours_worked}h logged on '{task.title}'."
+            
+        notif_ref.set({
+            "id": notif_ref.id,
+            "userId": task.assignedByUid,
+            "title": "Task Update",
+            "message": msg,
+            "type": "TimeLogged",
+            "entityType": "Task",
+            "entityId": task.id,
+            "triggeredBy": user_id,
+            "isRead": False,
+            "createdAt": datetime.now(timezone.utc)
+        })
     
     return entry
 
@@ -62,6 +82,7 @@ def get_time_entries_for_task(user_id: str, task_id: str) -> List[TimeEntryInDB]
     entries = []
     for doc in docs:
         doc_data = doc.to_dict() or {}
+        doc_data["id"] = doc.id
         entries.append(TimeEntryInDB(**doc_data))
     return entries
 
@@ -72,6 +93,7 @@ def get_all_time_entries(user_id: str) -> List[TimeEntryInDB]:
     entries = []
     for doc in docs:
         doc_data = doc.to_dict() or {}
+        doc_data["id"] = doc.id
         entries.append(TimeEntryInDB(**doc_data))
     return entries
 

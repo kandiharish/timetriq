@@ -6,15 +6,21 @@ export interface TimeEntry {
   id: string;
   task_id: string;
   date: string;
+  start_time?: string;
+  end_time?: string;
   hours_worked: number;
   notes?: string;
+  tags?: string;
 }
 
 export interface TimeEntryCreate {
   task_id: string;
   date: string;
+  start_time?: string;
+  end_time?: string;
   hours_worked: number;
   notes?: string;
+  tags?: string;
 }
 
 const getHeaders = async () => {
@@ -86,6 +92,16 @@ export const timeService = {
       });
       localStorage.setItem(`timetriq_tasks_${uid}`, JSON.stringify(updatedTasks));
 
+      // Update actualHours in shared tasks
+      const sharedTasks = JSON.parse(localStorage.getItem('timetriq_shared_tasks') || '[]');
+      const updatedSharedTasks = sharedTasks.map((t: any) => {
+        if (t.id === entry.task_id) {
+          return { ...t, actualHours: (t.actualHours || 0) + entry.hours_worked };
+        }
+        return t;
+      });
+      localStorage.setItem('timetriq_shared_tasks', JSON.stringify(updatedSharedTasks));
+
       return newEntry;
     }
   },
@@ -115,6 +131,15 @@ export const timeService = {
           return t;
         });
         localStorage.setItem(`timetriq_tasks_${uid}`, JSON.stringify(updatedTasks));
+
+        const sharedTasks = JSON.parse(localStorage.getItem('timetriq_shared_tasks') || '[]');
+        const updatedSharedTasks = sharedTasks.map((t: any) => {
+          if (t.id === targetEntry.task_id) {
+            return { ...t, actualHours: Math.max(0, (t.actualHours || 0) - targetEntry.hours_worked) };
+          }
+          return t;
+        });
+        localStorage.setItem('timetriq_shared_tasks', JSON.stringify(updatedSharedTasks));
       }
     }
   }

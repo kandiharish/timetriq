@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { taskService, type Task } from '../services/taskService';
 import { TaskForm } from '../components/TaskForm';
+import { CustomSelect } from '../components/CustomSelect';
+import { MonthCalendar } from '../components/MonthCalendar';
 import { ChevronLeft, ChevronRight, Plus, AlertCircle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -15,6 +17,7 @@ export const Calendar: React.FC = () => {
   
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [viewMode, setViewMode] = useState<'timeline' | 'month'>('timeline');
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -269,7 +272,21 @@ export const Calendar: React.FC = () => {
         {/* Timeline Header Toolbar */}
         <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827' }}>Project Timeline</span>
+            <div style={{ display: 'flex', backgroundColor: '#F3F4F6', borderRadius: '6px', padding: '2px' }}>
+              <button 
+                onClick={() => setViewMode('timeline')} 
+                style={{ padding: '4px 12px', fontSize: '0.75rem', fontWeight: 600, border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: viewMode === 'timeline' ? 'white' : 'transparent', color: viewMode === 'timeline' ? '#111827' : '#6B7280', boxShadow: viewMode === 'timeline' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}
+              >
+                Timeline
+              </button>
+              <button 
+                onClick={() => setViewMode('month')} 
+                style={{ padding: '4px 12px', fontSize: '0.75rem', fontWeight: 600, border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: viewMode === 'month' ? 'white' : 'transparent', color: viewMode === 'month' ? '#111827' : '#6B7280', boxShadow: viewMode === 'month' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}
+              >
+                Month
+              </button>
+            </div>
+            <div style={{ width: '1px', height: '24px', backgroundColor: '#E5E7EB', margin: '0 8px' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button onClick={() => { const d = new Date(viewDate); d.setDate(d.getDate() - 7); setViewDate(d); }} style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', color: '#374151' }}><ChevronLeft size={14}/></button>
               <button onClick={() => { const d = new Date(viewDate); d.setDate(d.getDate() + 7); setViewDate(d); }} style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', color: '#374151' }}><ChevronRight size={14}/></button>
@@ -280,101 +297,117 @@ export const Calendar: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', fontSize: '0.75rem', color: '#374151', outline: 'none', cursor: 'pointer' }}>
-                <option value="All">All Statuses</option>
-                <option value="Todo">Todo</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Review">Review</option>
-                <option value="Completed">Completed</option>
-             </select>
+             <CustomSelect 
+                value={statusFilter} 
+                onChange={setStatusFilter} 
+                options={[
+                  {value: 'All', label: 'All Statuses'},
+                  {value: 'Todo', label: 'Todo'},
+                  {value: 'In Progress', label: 'In Progress'},
+                  {value: 'Review', label: 'Review'},
+                  {value: 'Completed', label: 'Completed'}
+                ]} 
+                buttonStyle={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', fontSize: '0.75rem', color: '#374151', minWidth: '120px' }} 
+             />
           </div>
         </div>
 
-        {/* Timeline Grid Area */}
+        {/* Grid Area */}
         <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
-          
-          {/* Grid Header (Days) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(28, minmax(40px, 1fr))', borderBottom: '1px solid var(--color-border)', position: 'sticky', top: 0, backgroundColor: '#FFFFFF', zIndex: 10 }}>
-            {timelineDays.map((d, i) => {
-              const isToday = d.getTime() === today.getTime();
-              const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-              return (
-                <div key={i} style={{ 
-                  padding: '8px 4px', 
-                  textAlign: 'center', 
-                  borderRight: '1px solid #F3F4F6',
-                  backgroundColor: isToday ? '#EEF2FF' : (isWeekend ? '#F9FAFB' : '#FFFFFF')
-                }}>
-                  <div style={{ fontSize: '0.65rem', color: isToday ? '#4F46E5' : '#9CA3AF', textTransform: 'uppercase', fontWeight: 600 }}>{d.toLocaleDateString('en-US', { weekday: 'short' })[0]}</div>
-                  <div style={{ fontSize: '0.75rem', color: isToday ? '#4F46E5' : '#374151', fontWeight: isToday ? 700 : 500, marginTop: '2px' }}>{d.getDate()}</div>
-                </div>
-              );
-            })}
-          </div>
+          {viewMode === 'month' ? (
+            <div style={{ padding: '16px', height: '100%', boxSizing: 'border-box' }}>
+              <MonthCalendar 
+                currentDate={viewDate} 
+                tasks={tasks.filter(t => statusFilter === 'All' || t.status === statusFilter)} 
+                onTaskClick={handleOpenEditTask} 
+              />
+            </div>
+          ) : (
+            <>
+              {/* Grid Header (Days) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(28, minmax(40px, 1fr))', borderBottom: '1px solid var(--color-border)', position: 'sticky', top: 0, backgroundColor: '#FFFFFF', zIndex: 10 }}>
+                {timelineDays.map((d, i) => {
+                  const isToday = d.getTime() === today.getTime();
+                  const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                  return (
+                    <div key={i} style={{ 
+                      padding: '8px 4px', 
+                      textAlign: 'center', 
+                      borderRight: '1px solid #F3F4F6',
+                      backgroundColor: isToday ? '#EEF2FF' : (isWeekend ? '#F9FAFB' : '#FFFFFF')
+                    }}>
+                      <div style={{ fontSize: '0.65rem', color: isToday ? '#4F46E5' : '#9CA3AF', textTransform: 'uppercase', fontWeight: 600 }}>{d.toLocaleDateString('en-US', { weekday: 'short' })[0]}</div>
+                      <div style={{ fontSize: '0.75rem', color: isToday ? '#4F46E5' : '#374151', fontWeight: isToday ? 700 : 500, marginTop: '2px' }}>{d.getDate()}</div>
+                    </div>
+                  );
+                })}
+              </div>
 
-          {/* Grid Body (Lanes) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(28, minmax(40px, 1fr))', position: 'absolute', top: '41px', bottom: 0, left: 0, right: 0, zIndex: 0 }}>
-             {timelineDays.map((d, i) => {
-               const isToday = d.getTime() === today.getTime();
-               const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-               return (
-                 <div key={i} style={{ 
-                   borderRight: '1px solid #F3F4F6',
-                   backgroundColor: isToday ? 'rgba(79, 70, 229, 0.03)' : (isWeekend ? '#F9FAFB' : 'transparent'),
-                   height: '100%'
-                 }} />
-               );
-             })}
-          </div>
+              {/* Grid Body (Lanes) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(28, minmax(40px, 1fr))', position: 'absolute', top: '41px', bottom: 0, left: 0, right: 0, zIndex: 0 }}>
+                 {timelineDays.map((d, i) => {
+                   const isToday = d.getTime() === today.getTime();
+                   const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                   return (
+                     <div key={i} style={{ 
+                       borderRight: '1px solid #F3F4F6',
+                       backgroundColor: isToday ? 'rgba(79, 70, 229, 0.03)' : (isWeekend ? '#F9FAFB' : 'transparent'),
+                       height: '100%'
+                     }} />
+                   );
+                 })}
+              </div>
 
-          {/* Timeline Tasks (Bars) */}
-          <div style={{ position: 'relative', zIndex: 1, padding: '16px 0', minHeight: '100%' }}>
-             {timelineTasks.length === 0 ? (
-               <div style={{ textAlign: 'center', padding: '40px', color: '#9CA3AF', fontSize: '0.875rem' }}>No tasks in this timeframe.</div>
-             ) : (
-               timelineTasks.map(t => {
-                 const color = getStatusColor(t.status);
-                 return (
-                   <div key={t.id} style={{ 
-                     display: 'grid', 
-                     gridTemplateColumns: 'repeat(28, minmax(40px, 1fr))',
-                     marginBottom: '8px',
-                     padding: '0 4px',
-                     alignItems: 'center'
-                   }}>
-                     <div 
-                       onClick={() => handleOpenEditTask(t)}
-                       style={{ 
-                         gridColumn: `${t.startCol + 1} / span ${t.span}`,
-                         backgroundColor: color.bg,
-                         border: `1px solid ${color.text}40`,
-                         borderRadius: '4px',
-                         padding: '4px 8px',
-                         fontSize: '0.75rem',
-                         fontWeight: 500,
-                         color: color.text,
-                         whiteSpace: 'nowrap',
-                         overflow: 'hidden',
-                         textOverflow: 'ellipsis',
-                         cursor: 'pointer',
-                         boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                         display: 'flex',
-                         alignItems: 'center',
-                         gap: '6px'
-                       }}
-                       title={`${t.title} (${t.status})`}
-                     >
-                       <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: color.text, flexShrink: 0 }}></div>
-                       {t.title}
-                     </div>
-                   </div>
-                 );
-               })
-             )}
-          </div>
-
+              {/* Timeline Tasks (Bars) */}
+              <div style={{ position: 'relative', zIndex: 1, padding: '16px 0', minHeight: '100%' }}>
+                 {timelineTasks.length === 0 ? (
+                   <div style={{ textAlign: 'center', padding: '40px', color: '#9CA3AF', fontSize: '0.875rem' }}>No tasks in this timeframe.</div>
+                 ) : (
+                   timelineTasks.map(t => {
+                     const color = getStatusColor(t.status);
+                     return (
+                       <div key={t.id} style={{ 
+                         display: 'grid', 
+                         gridTemplateColumns: 'repeat(28, minmax(40px, 1fr))',
+                         marginBottom: '8px',
+                         padding: '0 4px',
+                         alignItems: 'center'
+                       }}>
+                         <div 
+                           onClick={() => handleOpenEditTask(t)}
+                           style={{ 
+                             gridColumn: `${t.startCol + 1} / span ${t.span}`,
+                             backgroundColor: color.bg,
+                             border: `1px solid ${color.text}40`,
+                             borderRadius: '4px',
+                             padding: '4px 8px',
+                             fontSize: '0.75rem',
+                             fontWeight: 500,
+                             color: color.text,
+                             whiteSpace: 'nowrap',
+                             overflow: 'hidden',
+                             textOverflow: 'ellipsis',
+                             cursor: 'pointer',
+                             boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                             display: 'flex',
+                             alignItems: 'center',
+                             gap: '6px'
+                           }}
+                           title={`${t.title} (${t.status})`}
+                         >
+                           <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: color.text, flexShrink: 0 }}></div>
+                           {t.title}
+                         </div>
+                       </div>
+                     );
+                   })
+                 )}
+              </div>
+            </>
+          )}
         </div>
       </div>
+
 
       {isTaskModalOpen && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

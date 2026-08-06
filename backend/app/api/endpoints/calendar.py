@@ -12,8 +12,8 @@ def get_workload_distribution(
     end_date: date = Query(..., description="End date of the range"),
     current_user: dict = Depends(get_current_user)
 ):
-    user_id = current_user.get("uid")
+    user_id = str(current_user.get("uid", ""))
     if start_date > end_date:
         raise HTTPException(status_code=400, detail="start_date must be before end_date")
-        
+
     return workload_engine.calculate_daily_workload(user_id, start_date, end_date)

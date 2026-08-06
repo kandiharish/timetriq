@@ -1,11 +1,13 @@
 import app.core.firebase as firebase
+from google.cloud.firestore import Client
 from app.models.settings import UserSettings, UserSettingsUpdate
 
 COLLECTION_NAME = "settings"
 
-def _get_db():
+def _get_db() -> Client:
     if not firebase.db:
         firebase.init_firebase()
+    assert firebase.db is not None, "Firestore client not initialized"
     return firebase.db
 
 def get_user_settings(user_id: str) -> UserSettings:
@@ -14,7 +16,7 @@ def get_user_settings(user_id: str) -> UserSettings:
     doc = doc_ref.get()
     
     if doc.exists:
-        data = doc.to_dict()
+        data = doc.to_dict() or {}
         data["user_id"] = user_id
         return UserSettings(**data)
     

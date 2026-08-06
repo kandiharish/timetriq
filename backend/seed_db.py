@@ -48,7 +48,7 @@ today = datetime.now()
 
 for task in tasks_data:
     task_id = str(uuid.uuid4())
-    due_date = (today + timedelta(days=task["offset_days"] + 7)).strftime("%Y-%m-%d")
+    due_date = (today + timedelta(days=int(task["offset_days"]) + 7)).strftime("%Y-%m-%d")
     
     task_doc = {
         "title": task["title"],
@@ -64,9 +64,9 @@ for task in tasks_data:
     db.collection('tasks').document(task_id).set(task_doc)
     print(f"Added task: {task['title']}")
     
-    if task["hoursWorked"] > 0:
+    if int(task["hoursWorked"]) > 0:
         entry_id = str(uuid.uuid4())
-        entry_date = (today + timedelta(days=task["offset_days"])).strftime("%Y-%m-%d")
+        entry_date = (today + timedelta(days=int(task["offset_days"]))).strftime("%Y-%m-%d")
         entry_doc = {
             "task_id": task_id,
             "user_id": task["assignedUserId"],

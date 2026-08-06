@@ -1,472 +1,226 @@
-# COLUMN_SPECIFICATION.md
-
-# Timetriq - Column Specification
-
-## Purpose
-
-This document defines every column required for the Timetriq Workload Planning platform.
-
-Each column includes:
-- Purpose
-- Data Type
-- Required/Optional
-- Validation
-- UI Component
-- Backend Field
-- Business Rules
-
----
-
-# Task Information
-
-## Task ID
-
-Purpose:
-Unique identifier for every task.
-
-Type:
-String (Auto Generated)
-
-UI:
-Hidden
-
-Backend:
-UUID / Firestore Document ID
-
----
-
-## Task Title
-
-Purpose:
-Short name describing the task.
-
-Type:
-String
-
-Required:
-Yes
-
-Validation:
-- Minimum 3 characters
-- Maximum 100 characters
-
-UI:
-Single Line Textbox
-
-Backend:
-title
-
-Example:
-Build Login Page
-
----
-
-## Description
-
-Purpose:
-Detailed explanation of the task.
-
-Type:
-Text
-
-Required:
-Optional
-
-UI:
-Textarea
-
-Backend:
-description
-
----
-
-## Project
-
-Purpose:
-Task belongs to which project.
-
-Type:
-Dropdown
-
-Required:
-Yes
-
-UI:
-Select
-
-Backend:
-projectId
-
-Example:
-Timetriq MVP
-
----
-
-## Assigned To
-
-Purpose:
-Owner responsible for completing the task.
-
-Type:
-User Reference
-
-Required:
-Yes
-
-UI:
-User Selector
-
-Backend:
-assignedUserId
-
----
-
-## Status
-
-Purpose:
-Current progress of the task.
-
-Type:
-Dropdown
-
-Values:
-- Todo
-- In Progress
-- Review
-- Completed
-- Blocked
-
-Required:
-Yes
-
-Backend:
-status
-
----
-
-## Priority
-
-Purpose:
-Importance of the task.
-
-Values:
-- Low
-- Medium
-- High
-- Critical
-
-Backend:
-priority
-
----
-
-# Planning Information
-
-## Estimated Hours
-
-Purpose:
-Estimated effort required to complete the task.
-
-Type:
-Number
-
-Required:
-Yes
-
-Validation:
-Must be greater than zero.
-
-Backend:
-estimatedHours
-
-Example:
-12
-
----
-
-## Actual Hours
-
-Purpose:
-Total hours logged against the task.
-
-Type:
-Calculated
-
-Editable:
-No
-
-Calculation:
-Sum of all Time Entries
-
-Backend:
-actualHours
-
----
-
-## Remaining Hours
-
-Purpose:
-Hours left to complete the task.
-
-Type:
-Calculated
-
-Formula:
-Estimated Hours - Actual Hours
-
-Backend:
-remainingHours
-
----
-
-## Variance
-
-Purpose:
-Difference between planned and actual effort.
-
-Formula:
-Actual Hours - Estimated Hours
-
-Positive:
-Over Budget
-
-Negative:
-Under Budget
-
-Backend:
-variance
-
----
-
-# Dates
-
-## Start Date
-
-Purpose:
-Planned task start.
-
-Type:
-Date
-
-Backend:
-startDate
-
----
-
-## Due Date
-
-Purpose:
-Expected completion date.
-
-Type:
-Date
-
-Backend:
-dueDate
-
----
-
-## Completed Date
-
-Purpose:
-Actual completion date.
-
-Type:
-Date
-
-Backend:
-completedDate
-
-Automatically set when Status becomes Completed.
-
----
-
-# Workload
-
-## Daily Planned Hours
-
-Purpose:
-Business Engine distributes Estimated Hours across working days.
-
-Editable:
-No
-
-Backend:
-Calculated
-
----
-
-## Capacity Used
-
-Purpose:
-Percentage of daily capacity consumed.
-
-Formula:
-Planned Hours / Daily Capacity
-
-Backend:
-capacityUsed
-
----
-
-## Capacity Remaining
-
-Purpose:
-Available working hours for the day.
-
-Formula:
-Daily Capacity - Planned Hours
-
-Backend:
-remainingCapacity
-
----
-
-# Progress
-
-## Progress %
-
-Purpose:
-Task completion percentage.
-
-Formula:
-Actual Hours / Estimated Hours × 100
-
-Maximum:
-100%
-
-Backend:
-progress
-
----
-
-# Time Tracking
-
-## Today's Logged Hours
-
-Purpose:
-Hours logged today.
-
-Backend:
-todayHours
-
----
-
-## Total Logged Entries
-
-Purpose:
-Number of time entries recorded.
-
-Backend:
-entryCount
-
----
-
-# Metadata
-
-## Created By
-
-Purpose:
-User who created the task.
-
-Auto Generated
-
-Backend:
-createdBy
-
----
-
-## Created At
-
-Purpose:
-Creation timestamp.
-
-Auto Generated
-
-Backend:
-createdAt
-
----
-
-## Updated At
-
-Purpose:
-Last modified timestamp.
-
-Auto Generated
-
-Backend:
-updatedAt
-
----
-
-# UI Mapping
-
-| Section | Fields |
-|---------|--------|
-| Basic Information | Title, Description, Project |
-| Assignment | Assigned To, Priority, Status |
-| Planning | Estimated Hours, Start Date, Due Date |
-| Tracking | Actual Hours, Remaining Hours, Progress |
-| Capacity | Daily Planned Hours, Capacity Used, Capacity Remaining |
-| Metadata | Created By, Created At, Updated At |
-
----
-
-# Business Rules
-
-- Estimated Hours must always be greater than 0.
-- Actual Hours are calculated only from Time Entries.
-- Remaining Hours cannot be edited manually.
-- Progress is calculated automatically.
-- Variance is calculated automatically.
-- Capacity is calculated by the Business Engine.
-- Users cannot modify calculated fields directly.
-- Every task belongs to exactly one project.
-- Every task has one owner.
-- Date validation must ensure Due Date is not earlier than Start Date.
-
----
-
-# Implementation Order
-
-Phase 1
-- Task Title
-- Description
-- Project
-- Assigned To
-- Status
-- Priority
-
-Phase 2
-- Estimated Hours
-- Start Date
-- Due Date
-
-Phase 3
-- Time Tracking
-- Actual Hours
-- Remaining Hours
-- Progress
-
-Phase 4
-- Capacity
-- Variance
-- Dashboard
-- Reports
-
----
-
-# Final Principle
-
-Only store source data in the database.
-
-The Business Engine should calculate:
-- Actual Hours
-- Remaining Hours
-- Progress
-- Variance
-- Capacity
-- Workload
-
-The frontend should only display these calculated values.
+6, in _serve
+    config.load()
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\config.py", line 434, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import       
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load    
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked     
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\timetriq\backend\app\main.py", line 4, in <module>
+    from app.api import api_router
+  File "C:\timetriq\backend\app\api\__init__.py", line 3, in <module>   
+    from app.api.endpoints import users, tasks, time_entries, dashboard, settings, calendar, notifications, workspace, admin, ai
+  File "C:\timetriq\backend\app\api\endpoints\tasks.py", line 6, in <module>
+    from app.services.notification_service import send_push_notification
+ImportError: cannot import name 'send_push_notification' from 'app.services.notification_service' (C:\timetriq\backend\app\services\notification_service.py)
+WARNING:  WatchFiles detected changes in 'app\services\ai_service.py'. Reloading...
+Process SpawnProcess-31:
+Traceback (most recent call last):
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\server.py", line 65, in run
+    return asyncio.run(self.serve(sockets=sockets))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\server.py", line 69, in serve
+    await self._serve(sockets)
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\server.py", line 76, in _serve
+    config.load()
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\config.py", line 434, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import       
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load    
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked     
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\timetriq\backend\app\main.py", line 4, in <module>
+    from app.api import api_router
+  File "C:\timetriq\backend\app\api\__init__.py", line 3, in <module>   
+    from app.api.endpoints import users, tasks, time_entries, dashboard, settings, calendar, notifications, workspace, admin, ai
+  File "C:\timetriq\backend\app\api\endpoints\tasks.py", line 6, in <module>
+    from app.services.notification_service import send_push_notification
+ImportError: cannot import name 'send_push_notification' from 'app.services.notification_service' (C:\timetriq\backend\app\services\notification_service.py)
+INFO:     Stopping reloader process [27960]
+
+(venv) C:\timetriq\backend>uvicorn app.main:app --reload
+INFO:     Will watch for changes in these directories: ['C:\\timetriq\\backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [5340] using WatchFiles
+Process SpawnProcess-1:
+Traceback (most recent call last):
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\server.py", line 65, in run
+    return asyncio.run(self.serve(sockets=sockets))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\server.py", line 69, in serve
+    await self._serve(sockets)
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\server.py", line 76, in _serve
+    config.load()
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\config.py", line 434, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import       
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load    
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked     
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\timetriq\backend\app\main.py", line 4, in <module>
+    from app.api import api_router
+  File "C:\timetriq\backend\app\api\__init__.py", line 3, in <module>   
+    from app.api.endpoints import users, tasks, time_entries, dashboard, settings, calendar, notifications, workspace, admin, ai
+  File "C:\timetriq\backend\app\api\endpoints\tasks.py", line 6, in <module>
+    from app.services.notification_service import send_push_notification
+ImportError: cannot import name 'send_push_notification' from 'app.services.notification_service' (C:\timetriq\backend\app\services\notification_service.py)
+WARNING:  WatchFiles detected changes in 'app\api\endpoints\tasks.py'. Reloading...
+Process SpawnProcess-2:
+Traceback (most recent call last):
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\server.py", line 65, in run
+    return asyncio.run(self.serve(sockets=sockets))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\server.py", line 69, in serve
+    await self._serve(sockets)
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\server.py", line 76, in _serve
+    config.load()
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\config.py", line 434, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import       
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load    
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked     
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\timetriq\backend\app\main.py", line 4, in <module>
+    from app.api import api_router
+  File "C:\timetriq\backend\app\api\__init__.py", line 3, in <module>   
+    from app.api.endpoints import users, tasks, time_entries, dashboard, settings, calendar, notifications, workspace, admin, ai
+  File "C:\timetriq\backend\app\api\endpoints\calendar.py", line 6, in <module>
+    from app.services.calendar_service import calendar_service
+  File "C:\timetriq\backend\app\services\calendar_service.py", line 6, in <module>
+    from app.services.task_service import task_service
+ImportError: cannot import name 'task_service' from 'app.services.task_service' (C:\timetriq\backend\app\services\task_service.py)
+INFO:     Stopping reloader process [5340]
+
+(venv) C:\timetriq\backend>uvicorn app.main:app --reload
+INFO:     Will watch for changes in these directories: ['C:\\timetriq\\backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [27916] using WatchFiles
+Process SpawnProcess-1:
+Traceback (most recent call last):
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\server.py", line 65, in run
+    return asyncio.run(self.serve(sockets=sockets))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\server.py", line 69, in serve
+    await self._serve(sockets)
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\server.py", line 76, in _serve
+    config.load()
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\config.py", line 434, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\timetriq\backend\venv\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kandi\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import       
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load    
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked     
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\timetriq\backend\app\main.py", line 4, in <module>
+    from app.api import api_router
+  File "C:\timetriq\backend\app\api\__init__.py", line 3, in <module>   
+    from app.api.endpoints import users, tasks, time_entries, dashboard, settings, calendar, notifications, workspace, admin, ai
+  File "C:\timetriq\backend\app\api\endpoints\calendar.py", line 6, in <module>
+    from app.services.calendar_service import calendar_service
+  File "C:\timetriq\backend\app\services\calendar_service.py", line 6, in <module>
+    from app.services.task_service import task_service
+ImportError: cannot import name 'task_service' from 'app.services.task_service' (C:\timetriq\backend\app\services\task_service.py)

@@ -87,8 +87,13 @@ export function parseEstimatedTime(input: string): { hours: number; needsClarifi
 
 export function formatHours(hours: number): string {
   if (!hours || hours <= 0) return '';
-  const h = Math.floor(hours);
-  const m = Math.round((hours - h) * 60);
+  let h = Math.floor(hours);
+  let m = Math.round((hours - h) * 60);
+  
+  if (m === 60) {
+    h += 1;
+    m = 0;
+  }
   
   if (h > 0 && m > 0) {
     return `${h} hour${h > 1 ? 's' : ''} ${m} minute${m > 1 ? 's' : ''}`;
@@ -102,8 +107,14 @@ export function formatHours(hours: number): string {
 
 export function formatHoursCompact(hours: number): string {
   if (!hours || hours <= 0) return '0h';
-  const h = Math.floor(hours);
-  const m = Math.round((hours - h) * 60);
+  let h = Math.floor(hours);
+  let m = Math.round((hours - h) * 60);
+  
+  if (m === 60) {
+    h += 1;
+    m = 0;
+  }
+  
   if (h > 0 && m > 0) {
     return `${h}h ${m}m`;
   } else if (h > 0) {
@@ -115,9 +126,14 @@ export function formatHoursCompact(hours: number): string {
 
 export function formatDurationHMS(hours: number): string {
   if (!hours || hours <= 0) return '-';
-  const h = Math.floor(hours);
-  const totalMinutes = Math.round((hours - h) * 60);
-  const m = totalMinutes;
+  let h = Math.floor(hours);
+  let m = Math.round((hours - h) * 60);
+  
+  if (m === 60) {
+    h += 1;
+    m = 0;
+  }
+  
   const s = 0; // Our current schema tracks hours down to minutes, seconds will be 0.
   return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }

@@ -17,6 +17,11 @@ import { TimeEntries } from './pages/TimeEntries';
 import { Reports } from './pages/Reports';
 import { Calendar } from './pages/Calendar';
 import { Workload } from './pages/Workload';
+import { SpaceView } from './pages/SpaceView';
+import { Teams } from './pages/Teams';
+import { TeamDetails } from './pages/TeamDetails';
+import { Projects } from './pages/Projects';
+import { ChatApp } from './pages/ChatApp';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -63,15 +68,18 @@ const AppContent: React.FC = () => {
         <Route path="calendar" element={<Calendar />} />
         <Route path="workload" element={<Workload />} />
         <Route path="reports" element={<Reports />} />
-        <Route path="projects" element={<PlaceholderPage title="Projects" />} />
+        <Route path="projects" element={<Projects />} />
         <Route path="clients" element={<PlaceholderPage title="Clients" />} />
-        <Route path="team" element={<PlaceholderPage title="Team" />} />
-        <Route path="workload" element={<PlaceholderPage title="Workload" />} />
+        <Route path="team" element={<Teams />} />
+        <Route path="teams" element={<Teams />} />
+        <Route path="teams/:id" element={<TeamDetails />} />
+        <Route path="chat" element={<ChatApp />} />
         <Route path="capacity" element={<PlaceholderPage title="Capacity" />} />
-        <Route path="performance" element={<PlaceholderPage title="Performance" />} />
-        <Route path="estimates" element={<PlaceholderPage title="Estimates" />} />
-        <Route path="trends" element={<PlaceholderPage title="Trends" />} />
         <Route path="integrations" element={<PlaceholderPage title="Integrations" />} />
+        
+        <Route path="spaces/:spaceId" element={<SpaceView type="space" />} />
+        <Route path="folders/:folderId" element={<SpaceView type="folder" />} />
+        <Route path="lists/:listId" element={<SpaceView type="list" />} />
       </Route>
       
       {/* Catch-all redirect */}

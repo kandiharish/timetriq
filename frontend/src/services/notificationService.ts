@@ -1,5 +1,5 @@
 import { getToken, onMessage } from 'firebase/messaging';
-import { messaging } from '../core/firebase';
+import { messaging, auth } from '../core/firebase';
 import toast from 'react-hot-toast';
 
 export const requestNotificationPermission = async (token: string) => {
@@ -76,5 +76,55 @@ export const initializeServiceWorker = () => {
           });
         }
       });
+  }
+};
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001/api/v1';
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: string;
+  entityType: string;
+  entityId: string;
+  triggeredBy: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export const appNotificationService = {
+  getNotifications: async (): Promise<AppNotification[]> => {
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('NETWORK_SKIP: User not authenticated');
+      const token = await user.getIdToken();
+      const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+      
+      const response = await fetch(`${API_BASE_URL}/notifications/`, { headers });
+      if (!response.ok) throw new Error('Failed to fetch notifications');
+      return await response.json();
+    } catch (e) {
+      console.warn("Backend not available, using local storage notifications.", e);
+      return [];
+    }
+  },
+
+  markAsRead: async (id: string): Promise<void> => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+      
+      const response = await fetch(`${API_BASE_URL}/notifications/${id}/read`, { 
+        method: 'PATCH',
+        headers 
+      });
+      if (!response.ok) throw new Error('Failed to mark read');
+    } catch (e) {
+      console.warn("Failed to mark read", e);
+    }
   }
 };

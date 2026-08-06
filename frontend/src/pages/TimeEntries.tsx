@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Calendar as CalendarIcon, Clock, TrendingUp, Target, Zap, Download, Plus, Edit2, Trash2, Play, Square } from 'lucide-react';
 import { useTimer } from '../context/TimerContext';
 import { Link } from 'react-router-dom';
+import { CustomSelect } from '../components/CustomSelect';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -21,6 +22,8 @@ export const TimeEntries: React.FC = () => {
   const [taskFilter, setTaskFilter] = useState<string>('All');
   const [tagFilter, setTagFilter] = useState<string>('All');
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
 
   const fetchData = async () => {
     try {
@@ -91,6 +94,9 @@ export const TimeEntries: React.FC = () => {
     if (tagFilter !== 'All' && tagLabel !== tagFilter) return false;
     return true;
   });
+
+  const paginatedEntries = filteredEntries.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = Math.ceil(filteredEntries.length / pageSize);
 
   const handleExportCSV = () => {
     if (filteredEntries.length === 0) return;
@@ -192,19 +198,25 @@ export const TimeEntries: React.FC = () => {
             <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: '#374151' }}>{dateRangeString}</span>
           </div>
           
-          <select value={taskFilter} onChange={e => setTaskFilter(e.target.value)} style={filterSelectStyle}>
-            <option value="All">All Tasks</option>
-            {uniqueTaskIds.map(tid => (
-              <option key={tid} value={tid}>{tasks[tid]?.title || 'Unknown Task'}</option>
-            ))}
-          </select>
+          <CustomSelect 
+            value={taskFilter} 
+            onChange={setTaskFilter} 
+            options={[
+              {value: 'All', label: 'All Tasks'},
+              ...uniqueTaskIds.map(tid => ({ value: tid, label: tasks[tid]?.title || 'Unknown Task' }))
+            ]} 
+            buttonStyle={filterSelectStyle} 
+          />
           
-          <select value={tagFilter} onChange={e => setTagFilter(e.target.value)} style={filterSelectStyle}>
-            <option value="All">All Tags</option>
-            {uniqueTags.map(tag => (
-              <option key={tag} value={tag}>{tag}</option>
-            ))}
-          </select>
+          <CustomSelect 
+            value={tagFilter} 
+            onChange={setTagFilter} 
+            options={[
+              {value: 'All', label: 'All Tags'},
+              ...uniqueTags.map(tag => ({ value: tag, label: tag }))
+            ]} 
+            buttonStyle={filterSelectStyle} 
+          />
           
           {(taskFilter !== 'All' || tagFilter !== 'All') && (
             <button 
@@ -303,9 +315,9 @@ export const TimeEntries: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredEntries.length === 0 ? (
+                {paginatedEntries.length === 0 ? (
                   <tr><td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#6B7280' }}>No time entries found.</td></tr>
-                ) : filteredEntries.map(entry => {
+                ) : paginatedEntries.map(entry => {
                   const task = tasks[entry.task_id];
                   const taskTitle = task?.title || 'Unknown Task';
                   const tColor = getTagColor(taskTitle);
@@ -365,13 +377,16 @@ export const TimeEntries: React.FC = () => {
           </div>
           
           <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border)' }}>
-            <div style={{ fontSize: '0.8125rem', color: '#6B7280' }}>Showing 1 to {filteredEntries.length} of {filteredEntries.length} entries</div>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <button style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', color: '#6B7280', cursor: 'pointer' }}>&lt;</button>
-              <button style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', backgroundColor: '#4F46E5', color: '#FFFFFF', fontWeight: 600, cursor: 'pointer' }}>1</button>
-              <button style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', color: '#6B7280', cursor: 'pointer' }}>2</button>
-              <button style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', color: '#6B7280', cursor: 'pointer' }}>&gt;</button>
+            <div style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
+              Showing {filteredEntries.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, filteredEntries.length)} of {filteredEntries.length} entries
             </div>
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', color: '#6B7280', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}>&lt;</button>
+                <button style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', backgroundColor: '#4F46E5', color: '#FFFFFF', fontWeight: 600 }}>{currentPage}</button>
+                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', color: '#6B7280', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}>&gt;</button>
+              </div>
+            )}
           </div>
         </div>
 

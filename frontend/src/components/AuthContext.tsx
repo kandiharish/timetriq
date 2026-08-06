@@ -6,16 +6,19 @@ import { isAllowedDomain } from '../utils/auth';
 
 interface AuthContextType {
   user: User | null;
+  role: string | null;
   loading: boolean;
   logout: () => Promise<void>;
+  hasRole: (allowedRoles: string[]) => boolean;
 }
 
-const AuthContext = createContext<AuthContextType>({ user: null, loading: true, logout: async () => {} });
+const AuthContext = createContext<AuthContextType>({ user: null, role: null, loading: true, logout: async () => {}, hasRole: () => false });
 
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,15 +38,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userSnap = await getDoc(userRef);
           
           if (!userSnap.exists()) {
-            await setDoc(userRef, {
+            const pendingRole = localStorage.getItem('pendingUserRole') || 'Employee';
+            const newUser = {
               displayName: u.displayName || u.email?.split('@')[0] || 'User',
               email: u.email,
-              role: 'employee',
+              role: pendingRole,
               createdAt: serverTimestamp(),
               lastLogin: serverTimestamp()
-            });
+            };
+            await setDoc(userRef, newUser);
+            setRole(pendingRole);
+            localStorage.removeItem('pendingUserRole');
           } else {
             // Update last login
+            const userData = userSnap.data();
+            setRole(userData?.role || 'Employee');
             await setDoc(userRef, { lastLogin: serverTimestamp() }, { merge: true });
           }
         } catch (error) {
@@ -60,12 +69,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     await signOut(auth);
+    setRole(null);
+  };
+
+  const hasRole = (allowedRoles: string[]) => {
+    if (!role) return false;
+    const lowerRole = role.toLowerCase();
+    return allowedRoles.map(r => r.toLowerCase()).includes(lowerRole);
   };
 
   const value = {
     user,
+    role,
     loading,
-    logout
+    logout,
+    hasRole
   };
 
   return (
