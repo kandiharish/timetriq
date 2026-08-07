@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { taskService, type Task, SAMPLE_TEAM_MEMBERS } from '../services/taskService';
 import { timeService, type TimeEntry } from '../services/timeService';
 import { TaskForm } from '../components/TaskForm';
+import { TaskChecklist } from '../components/task/TaskChecklist';
+import { TaskAttachments } from '../components/task/TaskAttachments';
 import { Tag as TagIcon, GripVertical, Search, CheckCircle2, Circle, Clock, Calendar as CalendarIcon, X, Plus, Trash2, Check, Play, Pause, XCircle, Target } from 'lucide-react';
 import { useTimer } from '../context/TimerContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -158,16 +160,25 @@ const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSel
           }
           const visible = assigneeIds.slice(0, MAX_SHOW);
           const extra = assigneeIds.length - MAX_SHOW;
+          
+          let extraNames = "";
+          if (extra > 0) {
+            extraNames = assigneeIds.slice(MAX_SHOW).map(aid => {
+              const m = SAMPLE_TEAM_MEMBERS.find(mem => mem.id === aid);
+              return m ? m.name : aid;
+            }).join(', ');
+          }
+
           return (
             <div style={{ display: 'flex', alignItems: 'center' }}>
               {visible.map((aid, i) => {
                 const m = SAMPLE_TEAM_MEMBERS.find(m => m.id === aid) || { initials: aid.substring(0,2).toUpperCase(), color: '#6B7280', name: aid };
                 return (
-                  <div key={aid} title={m.name} style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: m.color, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, border: '2px solid white', marginLeft: i === 0 ? '0' : '-8px', zIndex: MAX_SHOW - i, position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.15)', flexShrink: 0 }}>{m.initials}</div>
+                  <div key={aid} title={m.name} style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: m.color, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 700, border: '2px solid white', marginLeft: i === 0 ? '0' : '-14px', zIndex: MAX_SHOW - i, position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.15)', flexShrink: 0 }}>{m.initials}</div>
                 );
               })}
               {extra > 0 && (
-                <div title={`+${extra} more`} style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: '#E5E7EB', color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 800, border: '2px solid white', marginLeft: '-8px', zIndex: 0, position: 'relative', flexShrink: 0 }}>+{extra}</div>
+                <div title={`+${extra} more: ${extraNames}`} style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#F3F4F6', color: '#4B5563', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, border: '2px solid white', marginLeft: '-14px', zIndex: 0, position: 'relative', flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }}>+{extra}</div>
               )}
             </div>
           );
@@ -413,16 +424,25 @@ const StaticRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSelec
           }
           const visible = assigneeIds.slice(0, MAX_SHOW);
           const extra = assigneeIds.length - MAX_SHOW;
+          
+          let extraNames = "";
+          if (extra > 0) {
+            extraNames = assigneeIds.slice(MAX_SHOW).map(aid => {
+              const m = SAMPLE_TEAM_MEMBERS.find(mem => mem.id === aid);
+              return m ? m.name : aid;
+            }).join(', ');
+          }
+
           return (
             <div style={{ display: 'flex', alignItems: 'center' }}>
               {visible.map((aid, i) => {
                 const m = SAMPLE_TEAM_MEMBERS.find(m => m.id === aid) || { initials: aid.substring(0,2).toUpperCase(), color: '#6B7280', name: aid };
                 return (
-                  <div key={aid} title={m.name} style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: m.color, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, border: '2px solid white', marginLeft: i === 0 ? '0' : '-8px', zIndex: MAX_SHOW - i, position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.15)', flexShrink: 0 }}>{m.initials}</div>
+                  <div key={aid} title={m.name} style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: m.color, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 700, border: '2px solid white', marginLeft: i === 0 ? '0' : '-14px', zIndex: MAX_SHOW - i, position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.15)', flexShrink: 0 }}>{m.initials}</div>
                 );
               })}
               {extra > 0 && (
-                <div title={`+${extra} more`} style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: '#E5E7EB', color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 800, border: '2px solid white', marginLeft: '-8px', zIndex: 0, position: 'relative', flexShrink: 0 }}>+{extra}</div>
+                <div title={`+${extra} more: ${extraNames}`} style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#F3F4F6', color: '#4B5563', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, border: '2px solid white', marginLeft: '-14px', zIndex: 0, position: 'relative', flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }}>+{extra}</div>
               )}
             </div>
           );
@@ -1919,6 +1939,11 @@ export const Tasks: React.FC = () => {
                   style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #E5E7EB', fontSize: '0.875rem', outline: 'none' }}
                 />
               </div>
+            </div>
+
+            <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '2px dashed #E5E7EB', marginBottom: '24px' }}>
+              <TaskChecklist taskId={modalDraft.id} />
+              <TaskAttachments taskId={modalDraft.id} />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

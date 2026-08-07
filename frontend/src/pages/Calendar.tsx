@@ -3,8 +3,59 @@ import { taskService, type Task } from '../services/taskService';
 import { TaskForm } from '../components/TaskForm';
 import { CustomSelect } from '../components/CustomSelect';
 import { MonthCalendar } from '../components/MonthCalendar';
+import { WeeklyCalendar } from '../components/calendar/WeeklyCalendar';
+import { BiWeeklyCalendar } from '../components/calendar/BiWeeklyCalendar';
 import { ChevronLeft, ChevronRight, Plus, AlertCircle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+
+const TaskCarousel = ({ title, tasks, theme, onEdit }: { title: string, tasks: Task[], theme: 'red' | 'blue' | 'gray', onEdit: (t:Task)=>void }) => {
+  const [page, setPage] = useState(0);
+  const itemsPerPage = 3;
+  const pages = Math.ceil(tasks.length / itemsPerPage);
+  
+  const currentTasks = tasks.slice(page * itemsPerPage, (page + 1) * itemsPerPage);
+  
+  const themeColors = {
+    red: { bg: '#FEF2F2', border: '#FCA5A5', text: '#991B1B', header: '#DC2626' },
+    blue: { bg: '#EFF6FF', border: '#93C5FD', text: '#1E40AF', header: '#2563EB' },
+    gray: { bg: '#F9FAFB', border: '#E5E7EB', text: '#374151', header: '#4B5563' },
+  };
+  const colors = themeColors[theme];
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '16px', minWidth: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: colors.header, textTransform: 'uppercase', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {theme === 'red' && <AlertCircle size={14}/>} {title}
+          <span style={{ backgroundColor: colors.bg, padding: '2px 8px', borderRadius: '12px', fontSize: '0.7rem', color: colors.text }}>{tasks.length}</span>
+        </h3>
+        {pages > 1 && (
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} style={{ border: '1px solid var(--color-border)', borderRadius: '4px', background: 'white', cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.5 : 1 }}><ChevronLeft size={14}/></button>
+            <button onClick={() => setPage(Math.min(pages - 1, page + 1))} disabled={page === pages - 1} style={{ border: '1px solid var(--color-border)', borderRadius: '4px', background: 'white', cursor: page === pages - 1 ? 'default' : 'pointer', opacity: page === pages - 1 ? 0.5 : 1 }}><ChevronRight size={14}/></button>
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: '12px', flex: 1 }}>
+        {tasks.length === 0 ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: '#9CA3AF', fontSize: '0.875rem' }}>No {title.toLowerCase()} tasks.</div>
+        ) : (
+          currentTasks.map(t => (
+            <div key={t.id} onClick={() => onEdit(t)} style={{ flex: 1, backgroundColor: colors.bg, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '12px', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', transition: 'transform 0.1s', minWidth: 0 }}>
+              <div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: colors.text, marginBottom: '8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={t.title}>{t.title}</div>
+                <div style={{ fontSize: '0.75rem', color: colors.header }}>Due: {t.dueDate}</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>{t.status}</span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const Calendar: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -17,7 +68,8 @@ export const Calendar: React.FC = () => {
   
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('All');
-  const [viewMode, setViewMode] = useState<'timeline' | 'month'>('timeline');
+  const [viewMode, setViewMode] = useState<'timeline' | 'calendar'>('timeline');
+  const [calendarView, setCalendarView] = useState<'monthly' | 'weekly' | 'biweekly'>('monthly');
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -168,10 +220,13 @@ export const Calendar: React.FC = () => {
   if (loading) return <div style={{ padding: '24px', textAlign: 'center', color: '#6B7280' }}>Loading calendar...</div>;
 
   return (
-    <div style={{ display: 'flex', gap: '16px', maxWidth: '1600px', margin: '0 auto', height: '100%', alignItems: 'flex-start' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '1600px', margin: '0 auto', height: '100%', alignItems: 'flex-start' }}>
       
-      {/* LEFT SIDEBAR: AGENDA */}
-      <div style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '16px', flexShrink: 0 }}>
+      {/* TOP ROW: Sidebar + Calendar */}
+      <div style={{ display: 'flex', gap: '16px', width: '100%', flex: 1, minHeight: 0 }}>
+        
+        {/* LEFT SIDEBAR: AGENDA (Now just Mini Calendar) */}
+        <div style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '16px', flexShrink: 0 }}>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0, color: '#111827' }}>Schedule</h1>
@@ -194,80 +249,56 @@ export const Calendar: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center', fontSize: '0.7rem', color: '#6B7280', marginBottom: '4px' }}>
             <div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
           </div>
-          {/* Mocked mini grid for aesthetic density */}
+          {/* Functional Mini Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center' }}>
-            {Array.from({length: 35}).map((_, i) => (
-              <div key={i} style={{ 
-                height: '24px', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                fontSize: '0.75rem',
-                color: (i > 3 && i < 30) ? '#374151' : '#D1D5DB',
-                backgroundColor: i === 15 ? '#EEF2FF' : 'transparent',
-                borderRadius: '4px',
-                fontWeight: i === 15 ? 600 : 400
-              }}>
-                {(i % 30) + 1}
-              </div>
-            ))}
+            {(() => {
+              const mYear = viewDate.getFullYear();
+              const mMonth = viewDate.getMonth();
+              const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
+              const firstDay = new Date(mYear, mMonth, 1).getDay();
+              const todayStr = new Date().toDateString();
+
+              const cells = [];
+              for (let i = 0; i < firstDay; i++) {
+                cells.push(<div key={`b-${i}`} />);
+              }
+              for (let d = 1; d <= daysInMonth; d++) {
+                const dateObj = new Date(mYear, mMonth, d);
+                const isToday = dateObj.toDateString() === todayStr;
+                const isSelected = viewDate.toDateString() === dateObj.toDateString();
+                cells.push(
+                  <div 
+                    key={`d-${d}`}
+                    onClick={() => setViewDate(dateObj)}
+                    style={{ 
+                      height: '24px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      fontSize: '0.75rem',
+                      color: isSelected ? '#4F46E5' : '#374151',
+                      backgroundColor: isSelected ? '#EEF2FF' : 'transparent',
+                      borderRadius: '4px',
+                      fontWeight: isSelected ? 600 : (isToday ? 700 : 400),
+                      cursor: 'pointer',
+                      border: isToday && !isSelected ? '1px solid #E5E7EB' : 'none'
+                    }}
+                  >
+                    {d}
+                  </div>
+                );
+              }
+              return cells;
+            })()}
           </div>
           <div style={{ marginTop: '12px', textAlign: 'center' }}>
             <button onClick={() => setViewDate(new Date())} style={{ fontSize: '0.75rem', color: '#4F46E5', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer' }}>Today</button>
           </div>
         </div>
-
-        {/* Agenda Lists */}
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {overdueTasks.length > 0 && (
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#DC2626', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertCircle size={12}/> Overdue</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {overdueTasks.map(t => (
-                  <div key={t.id} onClick={() => handleOpenEditTask(t)} style={{ padding: '8px 12px', backgroundColor: '#FEF2F2', borderRadius: '6px', border: '1px solid #FCA5A5', cursor: 'pointer' }}>
-                    <div style={{ fontSize: '0.8125rem', fontWeight: 500, color: '#991B1B', marginBottom: '4px' }}>{t.title}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#DC2626' }}>Due: {t.dueDate}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4B5563', textTransform: 'uppercase', marginBottom: '8px' }}>Today</div>
-            {todayTasks.length === 0 ? <div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>No tasks due today.</div> : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {todayTasks.map(t => (
-                  <div key={t.id} onClick={() => handleOpenEditTask(t)} style={{ padding: '8px 12px', backgroundColor: '#FFFFFF', borderRadius: '6px', border: '1px solid var(--color-border)', cursor: 'pointer' }}>
-                    <div style={{ fontSize: '0.8125rem', fontWeight: 500, color: '#111827', marginBottom: '4px' }}>{t.title}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <span style={{ fontSize: '0.7rem', color: '#6B7280' }}>{t.estimatedHours}h est.</span>
-                       <span style={{ backgroundColor: getStatusColor(t.status).bg, color: getStatusColor(t.status).text, padding: '2px 6px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase' }}>{t.status}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4B5563', textTransform: 'uppercase', marginBottom: '8px' }}>Upcoming</div>
-            {upcomingTasks.length === 0 ? <div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>No upcoming tasks.</div> : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {upcomingTasks.map(t => (
-                  <div key={t.id} onClick={() => handleOpenEditTask(t)} style={{ padding: '8px 12px', backgroundColor: '#FFFFFF', borderRadius: '6px', border: '1px solid var(--color-border)', cursor: 'pointer' }}>
-                    <div style={{ fontSize: '0.8125rem', fontWeight: 500, color: '#111827', marginBottom: '4px' }}>{t.title}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>Due: {t.dueDate}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
-      </div>
 
       {/* RIGHT MAIN AREA: TIMELINE (GANTT) */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
         
         {/* Timeline Header Toolbar */}
         <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB' }}>
@@ -280,23 +311,81 @@ export const Calendar: React.FC = () => {
                 Timeline
               </button>
               <button 
-                onClick={() => setViewMode('month')} 
-                style={{ padding: '4px 12px', fontSize: '0.75rem', fontWeight: 600, border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: viewMode === 'month' ? 'white' : 'transparent', color: viewMode === 'month' ? '#111827' : '#6B7280', boxShadow: viewMode === 'month' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}
+                onClick={() => setViewMode('calendar')} 
+                style={{ padding: '4px 12px', fontSize: '0.75rem', fontWeight: 600, border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: viewMode === 'calendar' ? 'white' : 'transparent', color: viewMode === 'calendar' ? '#111827' : '#6B7280', boxShadow: viewMode === 'calendar' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none' }}
               >
-                Month
+                Calendar
               </button>
             </div>
-            <div style={{ width: '1px', height: '24px', backgroundColor: '#E5E7EB', margin: '0 8px' }} />
+            
+            <div style={{ width: '1px', height: '24px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />
+            
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button onClick={() => { const d = new Date(viewDate); d.setDate(d.getDate() - 7); setViewDate(d); }} style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', color: '#374151' }}><ChevronLeft size={14}/></button>
-              <button onClick={() => { const d = new Date(viewDate); d.setDate(d.getDate() + 7); setViewDate(d); }} style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', color: '#374151' }}><ChevronRight size={14}/></button>
+              <button onClick={() => { 
+                const d = new Date(viewDate); 
+                if (viewMode === 'timeline') {
+                  d.setDate(d.getDate() - 7); 
+                } else {
+                  if (calendarView === 'monthly') d.setMonth(d.getMonth() - 1);
+                  else if (calendarView === 'weekly') d.setDate(d.getDate() - 7);
+                  else d.setDate(d.getDate() - 14);
+                }
+                setViewDate(d); 
+              }} style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', color: '#374151' }}><ChevronLeft size={14}/></button>
+              <button onClick={() => { 
+                const d = new Date(viewDate); 
+                if (viewMode === 'timeline') {
+                  d.setDate(d.getDate() + 7); 
+                } else {
+                  if (calendarView === 'monthly') d.setMonth(d.getMonth() + 1);
+                  else if (calendarView === 'weekly') d.setDate(d.getDate() + 7);
+                  else d.setDate(d.getDate() + 14);
+                }
+                setViewDate(d); 
+              }} style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', color: '#374151', flexShrink: 0 }}><ChevronRight size={14}/></button>
             </div>
-            <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
-              {timelineStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(timelineStart.getTime() + 27 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            <span style={{ fontSize: '0.875rem', color: '#374151', fontWeight: 500, whiteSpace: 'nowrap' }}>
+              {viewMode === 'timeline' ? (
+                <>{timelineStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(timelineStart.getTime() + 27 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</>
+              ) : calendarView === 'monthly' ? (
+                <>{viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</>
+              ) : calendarView === 'weekly' ? (
+                <>{(() => {
+                  const d = new Date(viewDate);
+                  d.setDate(d.getDate() - d.getDay());
+                  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                })()} - {(() => {
+                  const d = new Date(viewDate);
+                  d.setDate(d.getDate() - d.getDay() + 6);
+                  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                })()}</>
+              ) : (
+                <>{(() => {
+                  const d = new Date(viewDate);
+                  d.setDate(d.getDate() - d.getDay());
+                  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                })()} - {(() => {
+                  const d = new Date(viewDate);
+                  d.setDate(d.getDate() - d.getDay() + 13);
+                  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                })()}</>
+              )}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+             {viewMode === 'calendar' && (
+               <CustomSelect 
+                 value={calendarView} 
+                 onChange={(v) => setCalendarView(v as 'monthly' | 'weekly' | 'biweekly')} 
+                 options={[
+                   {value: 'monthly', label: 'Monthly'},
+                   {value: 'weekly', label: 'Weekly'},
+                   {value: 'biweekly', label: 'Bi-Weekly'}
+                 ]} 
+                 buttonStyle={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', fontSize: '0.75rem', fontWeight: 600, color: '#374151', minWidth: '110px' }} 
+               />
+             )}
              <CustomSelect 
                 value={statusFilter} 
                 onChange={setStatusFilter} 
@@ -307,25 +396,42 @@ export const Calendar: React.FC = () => {
                   {value: 'Review', label: 'Review'},
                   {value: 'Completed', label: 'Completed'}
                 ]} 
-                buttonStyle={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', fontSize: '0.75rem', color: '#374151', minWidth: '120px' }} 
+                buttonStyle={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', fontSize: '0.75rem', color: '#374151', minWidth: '130px' }} 
              />
           </div>
         </div>
 
         {/* Grid Area */}
-        <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
-          {viewMode === 'month' ? (
-            <div style={{ padding: '16px', height: '100%', boxSizing: 'border-box' }}>
-              <MonthCalendar 
-                currentDate={viewDate} 
-                tasks={tasks.filter(t => statusFilter === 'All' || t.status === statusFilter)} 
-                onTaskClick={handleOpenEditTask} 
-              />
+        <div style={{ flex: 1, overflow: 'auto', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+          {viewMode === 'calendar' ? (
+            <div style={{ padding: '16px', flex: 1, boxSizing: 'border-box' }}>
+              {calendarView === 'monthly' && (
+                <MonthCalendar 
+                  currentDate={viewDate} 
+                  tasks={tasks.filter(t => statusFilter === 'All' || t.status === statusFilter)} 
+                  onTaskClick={handleOpenEditTask} 
+                  onDateClick={(date) => setViewDate(date)}
+                />
+              )}
+              {calendarView === 'weekly' && (
+                <WeeklyCalendar 
+                  currentDate={viewDate} 
+                  tasks={tasks.filter(t => statusFilter === 'All' || t.status === statusFilter)} 
+                  onTaskClick={handleOpenEditTask} 
+                />
+              )}
+              {calendarView === 'biweekly' && (
+                <BiWeeklyCalendar 
+                  currentDate={viewDate} 
+                  tasks={tasks.filter(t => statusFilter === 'All' || t.status === statusFilter)} 
+                  onTaskClick={handleOpenEditTask} 
+                />
+              )}
             </div>
           ) : (
-            <>
+            <div style={{ minWidth: '1400px', height: '100%', position: 'relative' }}>
               {/* Grid Header (Days) */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(28, minmax(40px, 1fr))', borderBottom: '1px solid var(--color-border)', position: 'sticky', top: 0, backgroundColor: '#FFFFFF', zIndex: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(28, minmax(50px, 1fr))', borderBottom: '1px solid var(--color-border)', position: 'sticky', top: 0, backgroundColor: '#FFFFFF', zIndex: 10 }}>
                 {timelineDays.map((d, i) => {
                   const isToday = d.getTime() === today.getTime();
                   const isWeekend = d.getDay() === 0 || d.getDay() === 6;
@@ -344,7 +450,7 @@ export const Calendar: React.FC = () => {
               </div>
 
               {/* Grid Body (Lanes) */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(28, minmax(40px, 1fr))', position: 'absolute', top: '41px', bottom: 0, left: 0, right: 0, zIndex: 0 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(28, minmax(50px, 1fr))', position: 'absolute', top: '41px', bottom: 0, left: 0, right: 0, zIndex: 0 }}>
                  {timelineDays.map((d, i) => {
                    const isToday = d.getTime() === today.getTime();
                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
@@ -368,7 +474,7 @@ export const Calendar: React.FC = () => {
                      return (
                        <div key={t.id} style={{ 
                          display: 'grid', 
-                         gridTemplateColumns: 'repeat(28, minmax(40px, 1fr))',
+                         gridTemplateColumns: 'repeat(28, minmax(50px, 1fr))',
                          marginBottom: '8px',
                          padding: '0 4px',
                          alignItems: 'center'
@@ -403,9 +509,17 @@ export const Calendar: React.FC = () => {
                    })
                  )}
               </div>
-            </>
+            </div>
           )}
         </div>
+      </div>
+      </div>
+
+      {/* BOTTOM ROW: Paginated Task Carousels */}
+      <div style={{ display: 'flex', gap: '16px', width: '100%', height: '170px', flexShrink: 0 }}>
+        <TaskCarousel title="Overdue" tasks={overdueTasks} theme="red" onEdit={handleOpenEditTask} />
+        <TaskCarousel title="Today" tasks={todayTasks} theme="blue" onEdit={handleOpenEditTask} />
+        <TaskCarousel title="Upcoming" tasks={upcomingTasks} theme="gray" onEdit={handleOpenEditTask} />
       </div>
 
 

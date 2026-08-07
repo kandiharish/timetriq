@@ -107,11 +107,17 @@ export const taskService = {
   createTask: async (task: TaskCreate): Promise<Task> => {
     try {
       const headers = await getHeaders();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      
       const response = await fetch(`${API_BASE_URL}/tasks/`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(task)
+        body: JSON.stringify(task),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
+      
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.detail || 'Failed to create task');
@@ -236,11 +242,17 @@ export const taskService = {
   updateTask: async (id: string, task: TaskCreate): Promise<Task> => {
     try {
       const headers = await getHeaders();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      
       const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(task)
+        body: JSON.stringify(task),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
+      
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.detail || 'Failed to update task');

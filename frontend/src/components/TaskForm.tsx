@@ -1,7 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { taskService, type TaskCreate, type Task } from '../services/taskService';
 import { useAuth } from './AuthContext';
-import { User, ChevronDown, X, Check } from 'lucide-react';
+import { User, ChevronDown, X, Check, Paperclip, Trash2 } from 'lucide-react';
+import { TaskChecklist } from './task/TaskChecklist';
+import { TaskAttachments } from './task/TaskAttachments';
+import { attachmentService } from '../services/attachmentService';
+import { parseEstimatedTime, formatHours } from '../lib/utils';
 
 interface TaskFormProps {
   initialTask?: Task;
@@ -13,9 +17,13 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showValidation, setShowValidation] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  const dueDateRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Mock users as requested
@@ -24,7 +32,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
       { id: 'sathyam', name: 'Sathyam (Manager)', initials: 'SA', color: '#059669', role: 'Manager' },
       { id: 'vishaka', name: 'Vishaka (HR)', initials: 'VI', color: '#D97706', role: 'HR' },
       { id: 'sakshi', name: 'Sakshi (HR)', initials: 'SA', color: '#DC2626', role: 'HR' },
-      { id: 'harish_kandi', name: 'Harish Kandi (Employee)', initials: 'HK', color: '#2563EB', role: 'Employee' },
       { id: 'pradeep', name: 'Pradeep (Member)', initials: 'PR', color: '#7C3AED', role: 'Team Member' },
       { id: 'ramu', name: 'Ramu (Member)', initials: 'RA', color: '#2563EB', role: 'Team Member' },
       { id: 'rahul', name: 'Rahul (Member)', initials: 'RA', color: '#0891B2', role: 'Team Member' },
@@ -35,6 +42,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
 
   const currentUserDisplayName = user?.displayName || user?.email || 'Unknown';
 
+  const processedTeamMembers = [
+    { id: 'myself', name: 'Me', initials: 'ME', color: '#4F46E5', role: 'Self' },
+    ...teamMembers.filter(m => m.id !== 'harish_kandi' && !m.name.includes(currentUserDisplayName))
+  ];
+
   const [form, setForm] = useState<TaskCreate>({
     title: initialTask?.title || '',
     projectId: initialTask?.projectId || 'default',
@@ -44,12 +56,16 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
     assignedByUid: initialTask?.assignedByUid || user?.uid || '',
     priority: initialTask?.priority || '',
     estimatedHours: initialTask?.estimatedHours || ('' as any),
-    startDate: initialTask?.startDate || '',
-    dueDate: initialTask?.dueDate || '',
+    startDate: initialTask?.startDate || new Date().toISOString().split('T')[0],
+    dueDate: initialTask?.dueDate || new Date().toISOString().split('T')[0],
     description: initialTask?.description || '',
     status: initialTask?.status || 'Todo',
     actualHours: initialTask?.actualHours || 0,
   });
+
+  const [estTimeInput, setEstTimeInput] = useState(
+    initialTask?.estimatedHours ? formatHours(initialTask.estimatedHours) : ''
+  );
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -57,10 +73,17 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
       }
+      if (formRef.current && !formRef.current.contains(e.target as Node)) {
+        // Optional: only close if not clicking a portal element like a date picker
+        const target = e.target as HTMLElement;
+        if (!target.closest('.flatpickr-calendar') && !target.closest('.toast')) {
+          onCancel();
+        }
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  }, [onCancel]);
 
   const toggleAssignee = (memberId: string) => {
     const current = form.assignees || [];
@@ -76,10 +99,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
     setForm({ ...form, assignees: (form.assignees || []).filter(a => a !== memberId) });
   };
 
-  const selectedMembers = teamMembers.filter(m => (form.assignees || []).includes(m.id));
+  const selectedMembers = processedTeamMembers.filter(m => (form.assignees || []).includes(m.id));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setShowValidation(true);
     if (!form.title.trim()) {
       setError('Title is required');
       return;
@@ -107,11 +131,23 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
     setLoading(true);
     setError(null);
     try {
+      let newTaskId = initialTask?.id;
       if (initialTask && initialTask.id) {
         await taskService.updateTask(initialTask.id, form);
       } else {
-        await taskService.createTask(form);
+        const createdTask = await taskService.createTask(form);
+        newTaskId = createdTask.id;
       }
+      
+      if (pendingFiles.length > 0 && newTaskId) {
+        // Fire and forget to prevent blocking the UI if Firebase Storage hangs
+        pendingFiles.forEach(file => {
+          attachmentService.uploadAttachment(newTaskId!, file).catch(e => {
+            console.error("Failed to upload pending attachment:", e);
+          });
+        });
+      }
+      
       onSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to save task');
@@ -122,14 +158,15 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
-    padding: '8px 12px',
-    borderRadius: '8px',
-    border: '1px solid #E5E7EB',
+    padding: '10px 14px',
+    borderRadius: '6px',
+    border: '1px solid #D1D5DB',
     fontSize: '0.875rem',
     outline: 'none',
     boxSizing: 'border-box',
-    backgroundColor: '#FAFAFA',
-    transition: 'border-color 0.15s',
+    backgroundColor: '#FFFFFF',
+    transition: 'all 0.15s ease',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
   };
 
   const labelStyle: React.CSSProperties = {
@@ -141,8 +178,16 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
     letterSpacing: '0.01em',
   };
 
+  const mandatoryStar = <span style={{ color: '#EF4444' }}>*</span>;
+
+  const getValidationStyle = (isValid: boolean) => ({
+    ...inputStyle,
+    borderColor: showValidation && !isValid ? '#EF4444' : '#D1D5DB',
+    backgroundColor: showValidation && !isValid ? '#FEF2F2' : '#FFFFFF',
+  });
+
   return (
-    <div style={{
+    <div ref={formRef} style={{
       backgroundColor: 'white',
       borderRadius: '14px',
       padding: '28px',
@@ -180,13 +225,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
 
         {/* Title */}
         <div>
-          <label style={labelStyle}>Task Title *</label>
+          <label style={labelStyle}>Task Title {mandatoryStar}</label>
           <input
-            style={inputStyle}
+            style={getValidationStyle(!!form.title.trim())}
             value={form.title}
             onChange={e => setForm({ ...form, title: e.target.value })}
             placeholder="What needs to be done?"
-            required
             autoFocus
           />
         </div>
@@ -206,7 +250,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
         <div>
           <label style={labelStyle}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <User size={13} /> Assignees
+              <User size={13} /> Assignees {mandatoryStar}
             </span>
           </label>
 
@@ -256,19 +300,14 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
               type="button"
               onClick={() => setDropdownOpen(!dropdownOpen)}
               style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                border: `1px solid ${dropdownOpen ? '#4F46E5' : '#E5E7EB'}`,
-                backgroundColor: '#FAFAFA',
+                ...getValidationStyle((form.assignees && form.assignees.length > 0) || !!form.assignedUserId),
+                padding: '10px 14px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                fontSize: '0.875rem',
                 color: selectedMembers.length === 0 ? '#9CA3AF' : '#374151',
-                boxShadow: dropdownOpen ? '0 0 0 3px rgba(79,70,229,0.1)' : 'none',
-                transition: 'all 0.15s',
+                boxShadow: dropdownOpen ? '0 0 0 3px rgba(79,70,229,0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
               }}
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -326,7 +365,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
                 <div style={{ padding: '8px', borderBottom: '1px solid #F3F4F6', fontSize: '0.7rem', color: '#9CA3AF', textAlign: 'center' }}>
                   Click to select / deselect
                 </div>
-                {teamMembers.map(member => {
+                {processedTeamMembers.map(member => {
                   const isSelected = (form.assignees || []).includes(member.id);
                   return (
                     <button
@@ -386,12 +425,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
         {/* Status & Priority */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
-            <label style={labelStyle}>Status *</label>
+            <label style={labelStyle}>Status {mandatoryStar}</label>
             <select
-              style={{ ...inputStyle, cursor: 'pointer' }}
+              style={{ ...getValidationStyle(!!form.status), cursor: 'pointer' }}
               value={form.status}
               onChange={e => setForm({ ...form, status: e.target.value })}
-              required
             >
               <option value="Todo">Todo</option>
               <option value="In Progress">In Progress</option>
@@ -401,12 +439,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
             </select>
           </div>
           <div>
-            <label style={labelStyle}>Priority *</label>
+            <label style={labelStyle}>Priority {mandatoryStar}</label>
             <select
-              style={{ ...inputStyle, cursor: 'pointer' }}
+              style={{ ...getValidationStyle(!!form.priority), cursor: 'pointer' }}
               value={form.priority}
               onChange={e => setForm({ ...form, priority: e.target.value })}
-              required
             >
               <option value="" disabled>Select Priority...</option>
               <option value="Low">🟢  Low</option>
@@ -420,16 +457,22 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
         {/* Hours */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
-            <label style={labelStyle}>Estimated Hours *</label>
+            <label style={labelStyle}>Estimated Time {mandatoryStar}</label>
             <input
-              type="number"
-              min="0.25"
-              step="0.25"
-              style={inputStyle}
-              value={form.estimatedHours}
-              onChange={e => setForm({ ...form, estimatedHours: parseFloat(e.target.value) || ('' as any) })}
-              required
-              placeholder="e.g., 2.5"
+              type="text"
+              style={getValidationStyle(!!form.estimatedHours && form.estimatedHours > 0)}
+              value={estTimeInput}
+              onChange={e => {
+                const val = e.target.value;
+                setEstTimeInput(val);
+                const { hours } = parseEstimatedTime(val);
+                setForm({ ...form, estimatedHours: hours });
+              }}
+              onBlur={() => {
+                const { hours } = parseEstimatedTime(estTimeInput);
+                setEstTimeInput(hours > 0 ? formatHours(hours) : '');
+              }}
+              placeholder="e.g. 1h 40m or 1.5"
             />
           </div>
           <div>
@@ -449,23 +492,27 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
         {/* Dates */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
-            <label style={labelStyle}>Start Date *</label>
+            <label style={labelStyle}>Start Date {mandatoryStar}</label>
             <input
               type="date"
-              style={inputStyle}
+              style={getValidationStyle(!!form.startDate)}
               value={form.startDate}
-              onChange={e => setForm({ ...form, startDate: e.target.value })}
-              required
+              onChange={e => {
+                setForm({ ...form, startDate: e.target.value });
+                if (e.target.value && dueDateRef.current) {
+                  dueDateRef.current.focus();
+                }
+              }}
             />
           </div>
           <div>
-            <label style={labelStyle}>Due Date *</label>
+            <label style={labelStyle}>Due Date {mandatoryStar}</label>
             <input
+              ref={dueDateRef}
               type="date"
-              style={inputStyle}
+              style={getValidationStyle(!!form.dueDate)}
               value={form.dueDate}
               onChange={e => setForm({ ...form, dueDate: e.target.value })}
-              required
             />
           </div>
         </div>
@@ -499,6 +546,54 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
           </button>
         </div>
       </form>
+
+      {/* Checklist and Attachments (Only in Edit Mode) */}
+      {initialTask && initialTask.id ? (
+        <div style={{ marginTop: '32px', paddingTop: '16px', borderTop: '2px dashed #E5E7EB' }}>
+          <TaskChecklist taskId={initialTask.id} />
+          <TaskAttachments taskId={initialTask.id} />
+        </div>
+      ) : (
+        <div style={{ marginTop: '32px', paddingTop: '16px', borderTop: '2px dashed #E5E7EB' }}>
+          <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Paperclip size={16} color="#374151" /> 
+            <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#374151' }}>Attachments</span>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+            {pendingFiles.map((file, idx) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '6px' }}>
+                <span style={{ fontSize: '0.875rem', color: '#374151', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                  {file.name}
+                </span>
+                <button type="button" onClick={() => setPendingFiles(prev => prev.filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '4px' }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <label style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            width: '100%', padding: '12px', border: '2px dashed #D1D5DB', borderRadius: '8px',
+            backgroundColor: '#F9FAFB', color: '#6B7280', fontSize: '0.875rem', fontWeight: 500, cursor: 'pointer'
+          }}>
+            <Paperclip size={18} />
+            Add Attachments
+            <input 
+              type="file" 
+              multiple 
+              onChange={(e) => {
+                if (e.target.files) {
+                  setPendingFiles(prev => [...prev, ...Array.from(e.target.files as FileList)]);
+                }
+                e.target.value = '';
+              }} 
+              style={{ display: 'none' }} 
+            />
+          </label>
+        </div>
+      )}
     </div>
   );
 };
