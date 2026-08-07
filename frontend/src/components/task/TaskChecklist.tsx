@@ -72,7 +72,7 @@ export const TaskChecklist: React.FC<TaskChecklistProps> = ({ taskId }) => {
     setDraggedItemIdx(index);
     e.dataTransfer.effectAllowed = 'move';
     // Required for Firefox
-    e.dataTransfer.setData('text/html', e.currentTarget.parentNode as string);
+    e.dataTransfer.setData('text/plain', 'dummy');
   };
 
   const handleDragOver = (index: number) => {

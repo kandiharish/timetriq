@@ -1000,7 +1000,7 @@ export const Tasks: React.FC = () => {
   const [overdueDateFilter, setOverdueDateFilter] = useState('All');
   const [completedDateFilter, setCompletedDateFilter] = useState('All');
   const [statsTimeFilter, setStatsTimeFilter] = useState('All');
-  const [showArchived, setShowArchived] = useState(false);
+  const showArchived = false;
 
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');

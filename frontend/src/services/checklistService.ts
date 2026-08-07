@@ -1,4 +1,4 @@
-import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, where, orderBy, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, where, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../core/firebase';
 
 export interface ChecklistItem {

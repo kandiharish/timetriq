@@ -1,4 +1,4 @@
-import { collection, doc, addDoc, deleteDoc, getDocs, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, addDoc, deleteDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../core/firebase';
 
 export interface TaskAttachment {

@@ -243,7 +243,7 @@ export const taskService = {
     }
   },
 
-  updateTask: async (id: string, task: TaskCreate): Promise<Task> => {
+  updateTask: async (id: string, task: Partial<Task>): Promise<Task> => {
     try {
       const headers = await getHeaders();
       const controller = new AbortController();

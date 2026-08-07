@@ -504,7 +504,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
                 zIndex: 50, maxHeight: '250px', overflowY: 'auto', padding: '8px',
               }}>
                 <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '4px 8px 8px' }}>Tasks</div>
-                {allTasks.filter(t => t.id !== form.id).map(t => {
+                {allTasks.filter(t => t.id !== initialTask?.id).map(t => {
                   const isSelected = (form.dependencies || []).includes(t.id);
                   return (
                     <div
@@ -536,7 +536,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
                     </div>
                   );
                 })}
-                {allTasks.filter(t => t.id !== form.id).length === 0 && (
+                {allTasks.filter(t => t.id !== initialTask?.id).length === 0 && (
                   <div style={{ padding: '12px', textAlign: 'center', color: '#6B7280', fontSize: '0.8125rem' }}>No other tasks available.</div>
                 )}
               </div>
@@ -548,7 +548,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
           <div>
             <label style={labelStyle}>Status {mandatoryStar}</label>
             <CustomSelect
-              value={form.status}
+              value={form.status || 'Todo'}
               onChange={val => setForm({ ...form, status: val })}
               options={[
                 { value: 'Todo', label: 'Todo' },
