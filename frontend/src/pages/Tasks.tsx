@@ -14,6 +14,8 @@ import { CSS } from '@dnd-kit/utilities';
 
 import { CustomSelect } from '../components/CustomSelect';
 import { formatHoursCompact, parseEstimatedTime, formatHours } from '../lib/utils';
+import { RichTextEditor } from '../components/RichTextEditor';
+import { KanbanBoard } from '../components/KanbanBoard';
 
 interface SortableRowProps {
   task: Task;
@@ -105,7 +107,7 @@ const SortableRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSel
             <div style={{ fontWeight: 600, color: '#111827', fontSize: '0.8125rem', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               {task.title}
             </div>
-            {task.description && <div style={{ fontSize: '0.7rem', color: '#6B7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '250px' }}>{task.description}</div>}
+            {task.description && <div style={{ fontSize: '0.7rem', color: '#6B7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '250px' }}>{task.description.replace(/<[^>]*>?/gm, '')}</div>}
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); onToggleStar(task.id); }}
@@ -371,7 +373,7 @@ const StaticRow: React.FC<SortableRowProps> = ({ task, isSelected, onToggleSelec
             <div style={{ fontWeight: 600, color: '#111827', fontSize: '0.8125rem', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               {task.title}
             </div>
-            {task.description && <div style={{ fontSize: '0.7rem', color: '#6B7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '250px' }}>{task.description}</div>}
+            {task.description && <div style={{ fontSize: '0.7rem', color: '#6B7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '250px' }}>{task.description.replace(/<[^>]*>?/gm, '')}</div>}
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); onToggleStar(task.id); }}
@@ -804,6 +806,7 @@ export const Tasks: React.FC = () => {
   const [modalDraft, setModalDraft] = useState<Task | null>(null);
 
   const [showStarredOnly, setShowStarredOnly] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
 
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ 
@@ -996,6 +999,8 @@ export const Tasks: React.FC = () => {
   const [dateFilter, setDateFilter] = useState('All');
   const [overdueDateFilter, setOverdueDateFilter] = useState('All');
   const [completedDateFilter, setCompletedDateFilter] = useState('All');
+  const [statsTimeFilter, setStatsTimeFilter] = useState('All');
+  const [showArchived, setShowArchived] = useState(false);
 
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -1005,8 +1010,30 @@ export const Tasks: React.FC = () => {
     try {
       setLoading(true);
       let data = await taskService.getTasks();
-      // Sort by order field
-      data = data.sort((a, b) => (a.order || 0) - (b.order || 0));
+      // Optional Auto-Archiving Logic for tasks completed > 14 days ago
+      const now = Date.now();
+      const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
+      let needsSave = false;
+      
+      data = data.map(t => {
+        if (t.status === 'Completed' && t.completedDate && !t.isArchived) {
+          const compDate = new Date(t.completedDate).getTime();
+          if (now - compDate > FOURTEEN_DAYS) {
+            needsSave = true;
+            return { ...t, isArchived: true };
+          }
+        }
+        return t;
+      });
+
+      if (needsSave) {
+         // Optionally save auto-archived tasks to backend in background
+         data.forEach(t => {
+           if (t.isArchived) taskService.updateTask(t.id, { isArchived: true });
+         });
+      }
+
+      data.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       setTasks(data);
     } catch (err: any) {
       console.error('Failed to load tasks', err);
@@ -1218,17 +1245,7 @@ export const Tasks: React.FC = () => {
     showToast(`Started Focus Sprint for "${task.title}"`, 'success');
   };
 
-  // Derived stats
-  const totalTasks = tasks.length;
-  const inProgressCount = tasks.filter(t => t.status === 'In Progress').length;
-  const todoCount = tasks.filter(t => t.status === 'Todo').length;
-  const completedCount = tasks.filter(t => t.status === 'Completed').length;
-  
   const today = new Date().toISOString().split('T')[0];
-  const overdueCount = tasks.filter(t => t.dueDate < today && t.status !== 'Completed').length;
-  
-  const totalEst = tasks.reduce((sum, t) => sum + t.estimatedHours, 0);
-  const totalAct = tasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
 
   // Helper to filter a task by date
   const filterTaskByDate = (t: Task, filterVal: string) => {
@@ -1253,8 +1270,20 @@ export const Tasks: React.FC = () => {
 
     if (filterVal === 'Today') return t.dueDate === todayStr;
     if (filterVal === 'Yesterday') return t.dueDate === yesterdayStr;
-    // "This Week" = any task whose dueDate falls within Mon–Sun of this week
+
     if (filterVal === 'This Week') return t.dueDate >= weekStartStr && t.dueDate <= weekEndStr;
+    
+    if (filterVal === 'This Month') {
+      const monthStartStr = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1).toISOString().split('T')[0];
+      const monthEndStr = new Date(todayObj.getFullYear(), todayObj.getMonth() + 1, 0).toISOString().split('T')[0];
+      return t.dueDate >= monthStartStr && t.dueDate <= monthEndStr;
+    }
+    if (filterVal === 'Last Month') {
+      const monthStartStr = new Date(todayObj.getFullYear(), todayObj.getMonth() - 1, 1).toISOString().split('T')[0];
+      const monthEndStr = new Date(todayObj.getFullYear(), todayObj.getMonth(), 0).toISOString().split('T')[0];
+      return t.dueDate >= monthStartStr && t.dueDate <= monthEndStr;
+    }
+
     if (filterVal === 'Custom Date' && (customStartDate || customEndDate)) {
       if (customStartDate && customEndDate) return t.dueDate >= customStartDate && t.dueDate <= customEndDate;
       if (customStartDate) return t.dueDate >= customStartDate;
@@ -1263,8 +1292,26 @@ export const Tasks: React.FC = () => {
     return true;
   };
 
+  // Derived stats
+  const statsTasks = tasks.filter(t => {
+    if (!showArchived && t.isArchived) return false;
+    return filterTaskByDate(t, statsTimeFilter);
+  });
+
+  const totalTasks = statsTasks.length;
+  const inProgressCount = statsTasks.filter(t => t.status === 'In Progress').length;
+  const todoCount = statsTasks.filter(t => t.status === 'Todo').length;
+  const completedCount = statsTasks.filter(t => t.status === 'Completed').length;
+  
+  const overdueCount = statsTasks.filter(t => t.dueDate < today && t.status !== 'Completed').length;
+  
+  const totalEst = statsTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+  const totalAct = statsTasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
+
   // Base list applying search, priority, and status (status 'Completed' is excluded from main list, so we handle it)
   const baseFilteredTasks = tasks.filter(t => {
+    if (!showArchived && t.isArchived) return false;
+    if (showArchived && !t.isArchived) return false; // In archive view, ONLY show archived tasks (optional, maybe standard is fine)
     if (showStarredOnly && !t.isStarred) return false;
     const matchesSearch = t.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPriority = priorityFilter === 'All' || t.priority === priorityFilter;
@@ -1323,12 +1370,27 @@ export const Tasks: React.FC = () => {
           <h1 style={{ fontSize: '1.25rem', fontWeight: 600, margin: '0 0 4px 0', color: '#111827' }}>My Tasks</h1>
           <p style={{ color: '#6B7280', fontSize: '0.75rem', margin: 0 }}>Organize, plan, and track your work.</p>
         </div>
-        <button 
-          onClick={() => setShowForm(true)}
-          className="btn-paper btn-paper-primary"
-        >
-          <Plus size={14} /> New Task
-        </button>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <DateFilterSelect
+            value={statsTimeFilter}
+            onChange={setStatsTimeFilter}
+            options={[
+              { value: 'All', label: 'All Time' },
+              { value: 'This Month', label: 'This Month' },
+              { value: 'Last Month', label: 'Last Month' },
+              { value: 'This Week', label: 'This Week' },
+            ]}
+            label="Stats:"
+            accentColor="#4F46E5"
+            accentBg="#EEF2FF"
+          />
+          <button 
+            onClick={() => setShowForm(true)}
+            className="btn-paper btn-paper-primary"
+          >
+            <Plus size={14} /> New Task
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards Row */}
@@ -1405,6 +1467,35 @@ export const Tasks: React.FC = () => {
             </span>
             Starred
           </button>
+          
+          {/* View Toggle */}
+          <div style={{ display: 'flex', backgroundColor: '#F3F4F6', padding: '4px', borderRadius: '8px', border: '1px solid #E5E7EB' }}>
+            <button 
+              onClick={() => setViewMode('list')}
+              style={{
+                padding: '6px 12px', borderRadius: '6px', fontSize: '0.8125rem', fontWeight: 600,
+                backgroundColor: viewMode === 'list' ? 'white' : 'transparent',
+                color: viewMode === 'list' ? '#111827' : '#6B7280',
+                boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                border: 'none', cursor: 'pointer', transition: 'all 0.15s'
+              }}
+            >
+              List
+            </button>
+            <button 
+              onClick={() => setViewMode('kanban')}
+              style={{
+                padding: '6px 12px', borderRadius: '6px', fontSize: '0.8125rem', fontWeight: 600,
+                backgroundColor: viewMode === 'kanban' ? 'white' : 'transparent',
+                color: viewMode === 'kanban' ? '#111827' : '#6B7280',
+                boxShadow: viewMode === 'kanban' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                border: 'none', cursor: 'pointer', transition: 'all 0.15s'
+              }}
+            >
+              Kanban
+            </button>
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#FFFFFF', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', width: '250px' }}>
             <Search size={16} color="#9CA3AF" style={{ marginRight: '8px' }} />
             <input 
@@ -1473,8 +1564,16 @@ export const Tasks: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Table */}
-      <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', paddingBottom: '60px' }}>
+      {/* Main Area */}
+      {viewMode === 'kanban' ? (
+        <KanbanBoard 
+          tasks={activeTasks}
+          onTaskStatusChange={handleStatusChange}
+          onClickTask={setActiveDetailsTask}
+          onToggleStar={handleToggleStar}
+        />
+      ) : (
+        <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', paddingBottom: '60px' }}>
           <div style={{ overflowX: 'auto', padding: '0 24px' }}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', textAlign: 'left' }}>
@@ -1624,12 +1723,15 @@ export const Tasks: React.FC = () => {
                 </SortableContext>
               </table>
             </DndContext>
-            <Pagination currentPage={activePage} totalItems={activeTasks.length} pageSize={pageSize} onPageChange={setActivePage} />
+            {viewMode === 'list' && (
+              <Pagination currentPage={activePage} totalItems={activeTasks.length} pageSize={pageSize} onPageChange={setActivePage} />
+            )}
           </div>
         </div>
+      )}
 
       {/* Overdue Tasks Table — always visible when any overdue tasks exist */}
-      {overdueBase.length > 0 && (
+      {(overdueBase.length > 0 && viewMode === 'list') && (
         <div style={{ marginTop: '32px', backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
           <div style={{ padding: '14px 24px', backgroundColor: '#FEF2F2', borderBottom: '1px solid #FECACA', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, color: '#991B1B', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1723,7 +1825,7 @@ export const Tasks: React.FC = () => {
       )}
 
       {/* Completed Tasks Table — always visible when any completed tasks exist */}
-      {completedBase.length > 0 && (
+      {(completedBase.length > 0 && viewMode === 'list') && (
         <div style={{ marginTop: '32px', backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
           <div style={{ padding: '14px 24px', backgroundColor: '#F0FDF4', borderBottom: '1px solid #A7F3D0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, color: '#065F46', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1896,12 +1998,12 @@ export const Tasks: React.FC = () => {
 
             <div style={{ marginBottom: '24px' }}>
               <h3 style={{ fontSize: '0.8125rem', color: '#6B7280', margin: '0 0 8px 0', fontWeight: 600 }}>Description</h3>
-              <textarea 
+              <RichTextEditor 
                 value={modalDraft.description || ''}
-                onChange={(e) => setModalDraft({ ...modalDraft, description: e.target.value })}
-                onBlur={(e) => handleModalSave('description', e.target.value)}
+                onChange={(value) => setModalDraft({ ...modalDraft, description: value })}
+                onBlur={() => handleModalSave('description', modalDraft.description || '')}
                 placeholder="Add a detailed description..."
-                style={{ width: '100%', minHeight: '120px', padding: '12px', borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '0.875rem', color: '#374151', outline: 'none', resize: 'vertical' }}
+                minHeight="120px"
               />
             </div>
 

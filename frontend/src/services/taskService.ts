@@ -21,6 +21,8 @@ export interface Task {
   actualHours?: number;
   order?: number;
   isStarred?: boolean;
+  dependencies?: string[];
+  isArchived?: boolean;
 }
 
 // Sample team members available for assignment
@@ -48,6 +50,8 @@ export interface TaskCreate {
   order?: number;
   actualHours?: number;
   isStarred?: boolean;
+  dependencies?: string[];
+  isArchived?: boolean;
 }
 
 const getHeaders = async () => {

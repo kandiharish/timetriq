@@ -466,6 +466,43 @@ export const Calendar: React.FC = () => {
 
               {/* Timeline Tasks (Bars) */}
               <div style={{ position: 'relative', zIndex: 1, padding: '16px 0', minHeight: '100%' }}>
+                 {/* Dependency Arrows Layer */}
+                 <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1, pointerEvents: 'none' }}>
+                   <defs>
+                     <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+                       <polygon points="0 0, 6 2, 0 4" fill="#9CA3AF" />
+                     </marker>
+                   </defs>
+                   {timelineTasks.map((t, index) => {
+                     if (!t.dependencies || t.dependencies.length === 0) return null;
+                     return t.dependencies.map(depId => {
+                       const depIndex = timelineTasks.findIndex(x => x.id === depId);
+                       if (depIndex === -1) return null;
+                       const depTask = timelineTasks[depIndex];
+                       
+                       const x1 = `${(depTask.startCol + depTask.span) * 100 / 28}%`;
+                       const y1 = 16 + (depIndex * 34) + 13;
+                       const x2 = `${(t.startCol) * 100 / 28}%`;
+                       const y2 = 16 + (index * 34) + 13;
+
+                       const midX = `${(depTask.startCol + depTask.span + t.startCol) / 2 * 100 / 28}%`;
+                       const pathD = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
+
+                       return (
+                         <path 
+                           key={`${t.id}-${depId}`} 
+                           d={pathD} 
+                           fill="none" 
+                           stroke="#9CA3AF" 
+                           strokeWidth="1.5" 
+                           strokeDasharray="4 2"
+                           markerEnd="url(#arrowhead)" 
+                         />
+                       );
+                     });
+                   })}
+                 </svg>
+
                  {timelineTasks.length === 0 ? (
                    <div style={{ textAlign: 'center', padding: '40px', color: '#9CA3AF', fontSize: '0.875rem' }}>No tasks in this timeframe.</div>
                  ) : (
@@ -486,7 +523,9 @@ export const Calendar: React.FC = () => {
                              backgroundColor: color.bg,
                              border: `1px solid ${color.text}40`,
                              borderRadius: '4px',
-                             padding: '4px 8px',
+                             padding: '0 8px',
+                             height: '26px',
+                             boxSizing: 'border-box',
                              fontSize: '0.75rem',
                              fontWeight: 500,
                              color: color.text,

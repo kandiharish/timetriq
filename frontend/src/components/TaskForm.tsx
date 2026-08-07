@@ -6,6 +6,8 @@ import { TaskChecklist } from './task/TaskChecklist';
 import { TaskAttachments } from './task/TaskAttachments';
 import { attachmentService } from '../services/attachmentService';
 import { parseEstimatedTime, formatHours } from '../lib/utils';
+import { RichTextEditor } from './RichTextEditor';
+import { CustomSelect } from './CustomSelect';
 
 interface TaskFormProps {
   initialTask?: Task;
@@ -22,8 +24,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const depDropdownRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const dueDateRef = useRef<HTMLInputElement>(null);
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const [depDropdownOpen, setDepDropdownOpen] = useState(false);
 
   useEffect(() => {
     // Mock users as requested
@@ -38,6 +43,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
       { id: 'dev', name: 'Dev (Member)', initials: 'DE', color: '#16A34A', role: 'Team Member' },
     ];
     setTeamMembers(MOCK_USERS);
+    taskService.getTasks().then(setAllTasks).catch(console.error);
   }, []);
 
   const currentUserDisplayName = user?.displayName || user?.email || 'Unknown';
@@ -61,6 +67,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
     description: initialTask?.description || '',
     status: initialTask?.status || 'Todo',
     actualHours: initialTask?.actualHours || 0,
+    dependencies: initialTask?.dependencies || [],
   });
 
   const [estTimeInput, setEstTimeInput] = useState(
@@ -72,6 +79,9 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
     const handler = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
+      }
+      if (depDropdownRef.current && !depDropdownRef.current.contains(e.target as Node)) {
+        setDepDropdownOpen(false);
       }
       if (formRef.current && !formRef.current.contains(e.target as Node)) {
         // Optional: only close if not clicking a portal element like a date picker
@@ -238,10 +248,9 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
         {/* Description */}
         <div>
           <label style={labelStyle}>Description</label>
-          <textarea
-            style={{ ...inputStyle, minHeight: '72px', resize: 'vertical', lineHeight: 1.5 }}
-            value={form.description}
-            onChange={e => setForm({ ...form, description: e.target.value })}
+          <RichTextEditor 
+            value={form.description || ''} 
+            onChange={value => setForm({ ...form, description: value })} 
             placeholder="Add more details about this task..."
           />
         </div>
@@ -422,35 +431,149 @@ export const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSuccess, onCa
           </div>
         </div>
 
-        {/* Status & Priority */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        {/* Dependencies */}
+        <div>
+          <label style={labelStyle}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Check size={13} /> Dependencies
+            </span>
+          </label>
+
+          {/* Selected dependencies chips */}
+          {(form.dependencies || []).length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+              {(form.dependencies || []).map(depId => {
+                const t = allTasks.find(x => x.id === depId);
+                if (!t) return null;
+                return (
+                  <span
+                    key={depId}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '3px 8px 3px 8px',
+                      borderRadius: '20px',
+                      backgroundColor: '#F3F4F6',
+                      border: `1.5px solid #E5E7EB`,
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: '#4B5563',
+                    }}
+                  >
+                    {t.title}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setForm({ ...form, dependencies: (form.dependencies || []).filter(id => id !== depId) }); }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', color: '#9CA3AF' }}
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Dropdown trigger */}
+          <div ref={depDropdownRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setDepDropdownOpen(!depDropdownOpen)}
+              style={{
+                ...inputStyle,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                color: (form.dependencies || []).length === 0 ? '#9CA3AF' : '#374151',
+                boxShadow: depDropdownOpen ? '0 0 0 3px rgba(79,70,229,0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {(form.dependencies || []).length === 0 ? 'Select dependencies...' : `${(form.dependencies || []).length} tasks selected`}
+              </span>
+              <ChevronDown size={15} style={{ transform: depDropdownOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s', color: '#6B7280' }} />
+            </button>
+
+            {depDropdownOpen && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                backgroundColor: 'white', border: '1px solid #E5E7EB',
+                borderRadius: '8px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                zIndex: 50, maxHeight: '250px', overflowY: 'auto', padding: '8px',
+              }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '4px 8px 8px' }}>Tasks</div>
+                {allTasks.filter(t => t.id !== form.id).map(t => {
+                  const isSelected = (form.dependencies || []).includes(t.id);
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => {
+                        const current = form.dependencies || [];
+                        if (isSelected) {
+                          setForm({ ...form, dependencies: current.filter(id => id !== t.id) });
+                        } else {
+                          setForm({ ...form, dependencies: [...current, t.id] });
+                        }
+                      }}
+                      style={{
+                        padding: '8px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '10px',
+                        cursor: 'pointer', backgroundColor: isSelected ? '#EEF2FF' : 'transparent', transition: 'background-color 0.15s'
+                      }}
+                      onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.backgroundColor = '#F9FAFB'; }}
+                      onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+                    >
+                      <div style={{
+                        width: '18px', height: '18px', borderRadius: '4px', border: `1.5px solid ${isSelected ? '#4F46E5' : '#D1D5DB'}`,
+                        backgroundColor: isSelected ? '#4F46E5' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        {isSelected && <Check size={12} color="white" strokeWidth={3} />}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '0.8125rem', fontWeight: 500, color: isSelected ? '#3730A3' : '#374151' }}>{t.title}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {allTasks.filter(t => t.id !== form.id).length === 0 && (
+                  <div style={{ padding: '12px', textAlign: 'center', color: '#6B7280', fontSize: '0.8125rem' }}>No other tasks available.</div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
           <div>
             <label style={labelStyle}>Status {mandatoryStar}</label>
-            <select
-              style={{ ...getValidationStyle(!!form.status), cursor: 'pointer' }}
+            <CustomSelect
               value={form.status}
-              onChange={e => setForm({ ...form, status: e.target.value })}
-            >
-              <option value="Todo">Todo</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Review">Review</option>
-              <option value="Blocked">Blocked</option>
-              <option value="Completed">Completed</option>
-            </select>
+              onChange={val => setForm({ ...form, status: val })}
+              options={[
+                { value: 'Todo', label: 'Todo' },
+                { value: 'In Progress', label: 'In Progress' },
+                { value: 'Review', label: 'Review' },
+                { value: 'Blocked', label: 'Blocked' },
+                { value: 'Completed', label: 'Completed' },
+              ]}
+              buttonStyle={getValidationStyle(!!form.status)}
+            />
           </div>
           <div>
             <label style={labelStyle}>Priority {mandatoryStar}</label>
-            <select
-              style={{ ...getValidationStyle(!!form.priority), cursor: 'pointer' }}
+            <CustomSelect
               value={form.priority}
-              onChange={e => setForm({ ...form, priority: e.target.value })}
-            >
-              <option value="" disabled>Select Priority...</option>
-              <option value="Low">🟢  Low</option>
-              <option value="Medium">🟡  Medium</option>
-              <option value="High">🔴  High</option>
-              <option value="Critical">🚨  Critical</option>
-            </select>
+              onChange={val => setForm({ ...form, priority: val })}
+              placeholder="Select Priority..."
+              options={[
+                { value: 'Low', label: '🟢  Low' },
+                { value: 'Medium', label: '🟡  Medium' },
+                { value: 'High', label: '🔴  High' },
+                { value: 'Critical', label: '🚨  Critical' },
+              ]}
+              buttonStyle={getValidationStyle(!!form.priority)}
+            />
           </div>
         </div>
 

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { WorkspaceSidebar } from './workspace/WorkspaceSidebar';
 import { StatusSelector } from './StatusSelector';
+import { presenceService, type UserPresence } from '../services/presenceService';
 
 export const Layout: React.FC = () => {
   const { logout, hasRole } = useAuth();
@@ -28,11 +29,31 @@ export const Layout: React.FC = () => {
   const notificationsRef = useRef<HTMLDivElement>(null);
 
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [onlineUsers, setOnlineUsers] = useState<UserPresence[]>([]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    // Start presence tracking for the current user
+    presenceService.updatePresence({ timerRunning: Object.keys(timers).length > 0 });
+    
+    const unsub = presenceService.subscribeToPresence((users) => {
+      // Filter out offline users or users inactive for > 5 mins
+      const now = Date.now();
+      const activeUsers = users.filter(u => {
+        if (u.currentStatus === 'Offline') return false;
+        const lastSeen = new Date(u.lastSeen).getTime();
+        return now - lastSeen < 5 * 60 * 1000;
+      });
+      setOnlineUsers(activeUsers);
+    });
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, [timers]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -213,6 +234,43 @@ export const Layout: React.FC = () => {
 
           {/* Right: Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-4)' }}>
+            
+            {/* Multiplayer Avatar Stack */}
+            {onlineUsers.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', marginRight: '8px', paddingRight: '16px', borderRight: '1px solid var(--color-border)' }} title={`${onlineUsers.length} online`}>
+                <div style={{ display: 'flex', flexDirection: 'row-reverse' }}>
+                  {onlineUsers.slice(0, 5).map((user, i) => (
+                    <div 
+                      key={user.userId} 
+                      title={`${user.name} (${user.currentStatus})`}
+                      style={{ 
+                        width: '28px', height: '28px', borderRadius: '50%', 
+                        backgroundColor: user.avatarColor || '#4F46E5', 
+                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                        fontSize: '0.7rem', fontWeight: 600,
+                        border: '2px solid var(--color-surface)',
+                        marginLeft: i === onlineUsers.slice(0, 5).length - 1 ? 0 : '-8px',
+                        zIndex: i, position: 'relative'
+                      }}
+                    >
+                      {user.initials}
+                      {/* Active indicator dot */}
+                      <span style={{ position: 'absolute', bottom: 0, right: 0, width: '8px', height: '8px', backgroundColor: '#10B981', border: '1.5px solid var(--color-surface)', borderRadius: '50%' }}></span>
+                    </div>
+                  ))}
+                  {onlineUsers.length > 5 && (
+                    <div style={{ 
+                      width: '28px', height: '28px', borderRadius: '50%', 
+                      backgroundColor: '#F3F4F6', color: '#4B5563', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                      fontSize: '0.65rem', fontWeight: 600, border: '2px solid var(--color-surface)',
+                      marginLeft: '-8px', zIndex: 10, position: 'relative'
+                    }}>
+                      +{onlineUsers.length - 5}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             
             {focusSession && (
               <div 
